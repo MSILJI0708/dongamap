@@ -1,0 +1,486 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>동아대 승학캠퍼스 경로 안내도</title>
+<style>
+  :root{
+    --bg: #101c24;
+    --panel: #17262f;
+    --panel-2: #1d2f3a;
+    --grid: #223642;
+    --line: #3c5866;
+    --line-dim: #2a4048;
+    --node: #6f97a3;
+    --node-stroke: #cfe3e9;
+    --text: #e7eef1;
+    --text-dim: #8fa7b0;
+    --accent: #f0a85c;
+    --accent-2: #d98a3d;
+    --indoor: #86d1c4;
+    --up: #e0765a;
+    --down: #6fb98f;
+    --flat: #9fb4bf;
+    --mono: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+    --serif: Georgia, 'Nanum Myeongjo', 'Times New Roman', serif;
+    --sans: -apple-system, 'Malgun Gothic', 'Segoe UI', sans-serif;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;background:var(--bg);color:var(--text);font-family:var(--sans);}
+  body{
+    min-height:100vh;
+    background-image:
+      linear-gradient(var(--grid) 1px, transparent 1px),
+      linear-gradient(90deg, var(--grid) 1px, transparent 1px);
+    background-size: 28px 28px;
+  }
+  .wrap{max-width:1180px;margin:0 auto;padding:28px 20px 60px;}
+
+  header{display:flex;align-items:baseline;justify-content:space-between;border-bottom:1px solid var(--line-dim);padding-bottom:16px;margin-bottom:22px;flex-wrap:wrap;gap:10px;}
+  .brand{display:flex;align-items:baseline;gap:12px;}
+  .brand .compass{font-size:22px;transform:translateY(2px);opacity:.8;}
+  h1{font-family:var(--serif);font-style:italic;font-weight:400;font-size:26px;margin:0;letter-spacing:.3px;}
+  .subtitle{font-family:var(--mono);font-size:11px;color:var(--text-dim);letter-spacing:1.5px;text-transform:uppercase;}
+  .scale{font-family:var(--mono);font-size:11px;color:var(--text-dim);}
+
+  .panel{background:var(--panel);border:1px solid var(--line-dim);border-radius:2px;}
+
+  .controls{display:flex;gap:14px;align-items:flex-end;flex-wrap:wrap;padding:18px 20px;margin-bottom:20px;}
+  .field{display:flex;flex-direction:column;gap:6px;}
+  .field label{font-family:var(--mono);font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:var(--text-dim);}
+  select{
+    background:var(--panel-2);color:var(--text);border:1px solid var(--line);
+    padding:9px 10px;font-size:14px;border-radius:2px;min-width:230px;font-family:var(--sans);
+  }
+  select:focus{outline:2px solid var(--accent);outline-offset:1px;}
+  .swap-btn, .go-btn{
+    border:1px solid var(--line);background:var(--panel-2);color:var(--text);
+    padding:9px 14px;border-radius:2px;cursor:pointer;font-size:13px;font-family:var(--sans);
+  }
+  .go-btn{background:var(--accent);color:#1a1206;border-color:var(--accent);font-weight:700;}
+  .go-btn:hover{background:var(--accent-2);}
+  .swap-btn:hover{border-color:var(--accent);color:var(--accent);}
+  .go-btn:focus, .swap-btn:focus{outline:2px solid var(--accent);outline-offset:2px;}
+
+  .layout{display:grid;grid-template-columns:1.5fr 1fr;gap:20px;align-items:start;}
+  @media (max-width:880px){.layout{grid-template-columns:1fr;}}
+
+  .map-panel{padding:16px;}
+  svg{width:100%;height:auto;display:block;}
+  .edge-base{stroke:var(--line);stroke-width:2;fill:none;}
+  .edge-path{stroke:var(--accent);stroke-width:4;fill:none;stroke-linecap:round;
+    stroke-dasharray:9 7; animation:march 1s linear infinite;}
+  @keyframes march{to{stroke-dashoffset:-32;}}
+  .node-dot{fill:var(--node);stroke:var(--node-stroke);stroke-width:1.2;}
+  .node-dot.on-path{fill:var(--accent);stroke:#fff3e0;}
+  .node-dot.endpoint{r:9;}
+  .node-label{font-family:var(--mono);font-size:9.5px;fill:var(--text-dim);}
+  .node-label.on-path{fill:var(--text);font-weight:700;}
+  .walker{fill:var(--accent);}
+
+  .legend{display:flex;gap:16px;flex-wrap:wrap;padding:10px 18px 4px;font-family:var(--mono);font-size:10.5px;color:var(--text-dim);}
+  .legend span{display:inline-flex;align-items:center;gap:5px;}
+  .dot{width:9px;height:9px;border-radius:50%;display:inline-block;}
+
+  .side{display:flex;flex-direction:column;gap:16px;}
+  .summary{padding:18px 20px;}
+  .summary h2{font-family:var(--serif);font-style:italic;font-weight:400;font-size:18px;margin:0 0 12px;}
+  .stat-row{display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px dashed var(--line-dim);font-size:13px;}
+  .stat-row:last-child{border-bottom:none;}
+  .stat-row .k{color:var(--text-dim);}
+  .stat-row .v{font-family:var(--mono);}
+
+  .steps{padding:6px 0 14px;}
+  .steps h2{font-family:var(--serif);font-style:italic;font-weight:400;font-size:18px;margin:0;padding:14px 20px 8px;}
+  .step{padding:10px 20px;border-top:1px solid var(--line-dim);display:flex;gap:12px;align-items:flex-start;}
+  .step-idx{font-family:var(--mono);color:var(--accent);font-size:12px;min-width:20px;}
+  .step-body{flex:1;}
+  .step-route{font-size:13.5px;margin-bottom:4px;}
+  .step-route b{font-weight:700;}
+  .step-meta{display:flex;gap:10px;flex-wrap:wrap;font-family:var(--mono);font-size:11px;color:var(--text-dim);}
+  .tag{padding:1px 6px;border-radius:10px;border:1px solid var(--line);}
+  .tag.indoor{color:var(--indoor);border-color:var(--indoor);}
+  .tag.up{color:var(--up);border-color:var(--up);}
+  .tag.down{color:var(--down);border-color:var(--down);}
+  .tag.flat{color:var(--flat);border-color:var(--flat);}
+
+  .empty{padding:26px 20px;color:var(--text-dim);font-size:13px;line-height:1.6;}
+  .empty b{color:var(--text);}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <div class="brand">
+      <span class="compass">⟡</span>
+      <div>
+        <h1>승학캠퍼스 경로 안내도</h1>
+        <div class="subtitle">Dong-A Univ. Seunghak Campus — Route Finder</div>
+      </div>
+    </div>
+    <div class="scale">33 ROADS · 23 NODES · WEIGHT = TIME(MIN)</div>
+  </header>
+
+  <div class="panel controls">
+    <div class="field">
+      <label for="start">출발지</label>
+      <select id="start"></select>
+    </div>
+    <button class="swap-btn" id="swap" title="출발/도착 바꾸기">⇄ 바꾸기</button>
+    <div class="field">
+      <label for="end">도착지</label>
+      <select id="end"></select>
+    </div>
+    <button class="go-btn" id="go">경로 찾기</button>
+  </div>
+
+  <div class="layout">
+    <div class="panel map-panel">
+      <svg id="map" viewBox="0 0 700 940"></svg>
+      <div class="legend">
+        <span><span class="dot" style="background:var(--node)"></span>기본 노드</span>
+        <span><span class="dot" style="background:var(--accent)"></span>경로 노드</span>
+        <span>━ 실선: 도로</span>
+        <span style="color:var(--accent)">┅ 점선(애니메이션): 안내 경로</span>
+      </div>
+    </div>
+
+    <div class="side">
+      <div class="panel summary" id="summary">
+        <h2>요약</h2>
+        <div class="empty">출발지와 도착지를 선택하고 <b>경로 찾기</b>를 눌러주세요.</div>
+      </div>
+      <div class="panel steps" id="steps"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ===================== 1. 데이터 ===================== */
+const NAMES = {
+  "정문":"정문",
+  "108계단":"108계단",
+  "차고지":"차고지",
+  "체대":"체육대학",
+  "농구장":"농구장",
+  "삼각지":"삼각지",
+  "s01":"대학본부 및 인문과학대학(S01)",
+  "s02":"학생회관(S02)",
+  "s03":"공대1호관(S03)",
+  "s04":"공대2호관(S04)",
+  "s05":"공대3호관(S05)",
+  "s06":"공대5호관(S06)",
+  "s06지하":"공대5호관 지하(S06)",
+  "s06 2층":"공대5호관 2층(S06)",
+  "s06 3층":"공대5호관 3층(S06)",
+  "s06 4층":"공대5호관 4층(S06)",
+  "s06 6층":"공대5호관 6층(S06)",
+  "도서관":"한림도서관",
+  "도서관 2층":"한림도서관 2층",
+  "체대2":"체육대학2",
+  "체대2 4층":"체육대학2 4층",
+  "체대2 7층":"체육대학2 7층",
+  "체대 4층":"체육대학 4층",
+  "체대 7층":"체육대학 7층",
+  "야외정원":"야외정원",
+  "s11":"자연과학대학(S11)",
+  "s11 3층":"자연과학대학 3층(S11)",
+  "s12":"공과대학4호관(S12)",
+  "s12 지하":"공과대학4호관 지하(S12)",
+  "s12 1층":"공과대학4호관 1층(S12)",
+  "s12 4층":"공과대학4호관 4층(S12)",
+  "s01 4층":"대학본부 및 인문과학대학 4층(S01)",
+  "s04 4층":"공대2호관 4층(S04)",
+  "s05 4층":"공대3호관 4층(S05)",
+  "bs04":"산학협력관 버스정류장(BS04)",
+};
+
+// id, from, to, time(분), type, indoor(Y/N), slope(경사, from->to 방향 기준)
+const EDGES = [
+["r01","정문","108계단",4,"도보","N",2],
+["r02","정문","차고지",6,"도보","N",2],
+["r03","정문","체대",1,"도보","N",1],
+["r04","정문","농구장",4,"도보","N",1],
+["r05","108계단","s01",1,"도보","N",-1],
+["r06","108계단","체대",1,"도보","N",-1],
+["r07","차고지","s01",1,"도보","N",1],
+["r08","체대","s01",2,"도보","N",0],
+["r09","체대","삼각지",2,"도보","N",0],
+["r10","체대","농구장",1,"도보","N",1],
+["r11","s01","s02",2,"도보","Y",1],
+["r12","삼각지","s02",2,"도보","N",2],
+["r13","농구장","도서관",1,"도보","N",1],
+["r14","농구장","체대2",3,"도보","N",1],
+["r15","s02","s03",2,"도보","N",1],
+["r16","s03","s04",2,"도보","Y",1],
+["r17","s03","도서관",2,"도보","N",1],
+["r18","s03","야외정원",3,"도보","N",1],
+["r19","s04","s05",1,"도보","N",0],
+["r20","s04","야외정원",1,"도보","N",0],
+["r21","s04","s06지하",2,"도보","N",0],
+["r22","s05","s06",4,"도보","Y",2],
+["r23","도서관","체대2",1,"도보","N",1],
+["r24","도서관","s11",1,"도보","N",1],
+["r25","s11","s12",3,"도보","N",2],
+["r26","s11","bs04",1,"도보","N",0],
+["r27","bs04","s04",1,"도보","N",0],
+["r28","bs04","s12",1,"도보","N",1],
+["r29","s12 1층","s05",2,"도보","N",1],
+["r30","s12 4층","s05",2,"도보","N",-1],
+["r31","s12 4층","s06 6층",3,"도보","N",1],
+["r32","s12 4층","체대2",4,"도보","N",1],
+["r33","야외정원","s06 4층",1,"도보","N",1],
+["r34","s01","s01 4층",1,"엘리베이터","Y",0],
+["r35","s04","s04 4층",1,"엘리베이터","Y",0],
+["r36","s06지하","s06 2층",1,"엘리베이터","Y",0],
+["r37","s06지하","s06 6층",1,"엘리베이터","Y",0],
+["r38","s06 2층","s06 6층",1,"엘리베이터","Y",0],
+["r39","체대","체대 4층",1,"엘리베이터","Y",0],
+["r40","체대","체대 7층",1,"엘리베이터","Y",0],
+["r41","체대 4층","체대 7층",1,"엘리베이터","Y",0],
+["r42","도서관","도서관 2층",1,"엘리베이터","Y",0],
+["r43","체대2","체대2 4층",1,"엘리베이터","Y",0],
+["r44","체대2","체대2 7층",1,"엘리베이터","Y",0],
+["r45","체대2 4층","체대2 7층",1,"엘리베이터","Y",0],
+["r46","s12 1층","s05 4층",1,"도보","Y",0],
+["r47","s12 4층","s05 4층",1,"도보","Y",0],
+["r48","s05 4층","s06 3층",1,"도보","Y",0],
+["r49","s12 지하","s11 3층",1,"도보","Y",0],
+["r50","s12 1층","s11 3층",1,"도보","Y",0],
+["r51","체대2 4층","s12 4층",1,"도보","Y",0],
+];
+
+/* ===================== 2. 그래프 & 레이아웃 ===================== */
+const nodes = new Set();
+EDGES.forEach(([id,f,t])=>{nodes.add(f);nodes.add(t);});
+const nodeList = [...nodes];
+
+const adj = {}; nodeList.forEach(n=>adj[n]=[]);
+EDGES.forEach(([id,f,t,time,type,indoor,slope])=>{
+  adj[f].push({to:t, id, time, type, indoor, slope});
+  adj[t].push({to:f, id, time, type, indoor, slope: -slope});
+});
+
+// depth: BFS from 정문
+const depth = {"정문":0};
+{
+  const q=["정문"];
+  while(q.length){
+    const cur=q.shift();
+    adj[cur].forEach(e=>{
+      if(!(e.to in depth)){ depth[e.to]=depth[cur]+1; q.push(e.to); }
+    });
+  }
+}
+nodeList.forEach(n=>{ if(!(n in depth)) depth[n]=0; });
+
+// 첫 등장 순서
+const firstSeen = {}; let ctr=0;
+EDGES.forEach(([id,f,t])=>{
+  if(!(f in firstSeen)) firstSeen[f]=ctr++;
+  if(!(t in firstSeen)) firstSeen[t]=ctr++;
+});
+
+function baseName(n){ return n.replace(/\s*(지하|\d+층)$/,'').trim(); }
+
+// 레이어별로 노드 묶기
+const layers = {};
+nodeList.forEach(n=>{ (layers[depth[n]] = layers[depth[n]] || []).push(n); });
+
+const W = 700, H = 940, marginX = 60, marginY = 60;
+const maxDepth = Math.max(...Object.keys(layers).map(Number));
+const layerGap = (H - marginY*2) / maxDepth;
+
+// 1차: 레이어 내부에서 등장 순서로 x 배치
+let rawX = {};
+Object.entries(layers).forEach(([d, arr])=>{
+  arr.sort((a,b)=>firstSeen[a]-firstSeen[b]);
+  arr.forEach((n,i)=>{
+    rawX[n] = arr.length===1 ? W/2 : marginX + (W-marginX*2) * (i/(arr.length-1));
+  });
+});
+
+// 2차: 같은 건물(base name) 그룹 x평균으로 당기기
+const groups = {};
+nodeList.forEach(n=>{ (groups[baseName(n)] = groups[baseName(n)] || []).push(n); });
+const groupAvgX = {};
+Object.entries(groups).forEach(([b,arr])=>{
+  groupAvgX[b] = arr.reduce((s,n)=>s+rawX[n],0)/arr.length;
+});
+const pull = 0.45;
+let blendedX = {};
+nodeList.forEach(n=>{
+  const b = baseName(n);
+  blendedX[n] = rawX[n]*(1-pull) + groupAvgX[b]*pull;
+});
+
+// 3차: 레이어 내 최소 간격 확보
+const minGap = 46;
+Object.entries(layers).forEach(([d, arr])=>{
+  arr.sort((a,b)=>blendedX[a]-blendedX[b]);
+  for(let i=1;i<arr.length;i++){
+    if(blendedX[arr[i]] - blendedX[arr[i-1]] < minGap){
+      blendedX[arr[i]] = blendedX[arr[i-1]] + minGap;
+    }
+  }
+});
+
+// y좌표 (같은 depth 내에서는 먼저 등장한 쪽이 살짝 위로)
+const pos = {};
+Object.entries(layers).forEach(([d, arr])=>{
+  const dNum = Number(d);
+  const ranked = [...arr].sort((a,b)=>firstSeen[a]-firstSeen[b]);
+  ranked.forEach((n,rank)=>{
+    const microOffset = (ranked.length>1 ? rank/(ranked.length-1) : 0) * (layerGap*0.28);
+    pos[n] = { x: blendedX[n], y: marginY + dNum*layerGap - microOffset };
+  });
+});
+
+/* ===================== 3. Dijkstra (시간 최소) ===================== */
+function dijkstra(start, end){
+  const dist = {}, prev = {}, prevEdge = {};
+  nodeList.forEach(n=>dist[n]=Infinity);
+  dist[start]=0;
+  const visited = new Set();
+  while(true){
+    let cur=null, best=Infinity;
+    for(const n of nodeList){ if(!visited.has(n) && dist[n]<best){best=dist[n]; cur=n;} }
+    if(cur===null) break;
+    if(cur===end) break;
+    visited.add(cur);
+    adj[cur].forEach(e=>{
+      const nd = dist[cur]+e.time;
+      if(nd < dist[e.to]){ dist[e.to]=nd; prev[e.to]=cur; prevEdge[e.to]=e; }
+    });
+  }
+  if(dist[end]===Infinity) return null;
+  const path=[end]; let c=end;
+  const usedEdges=[];
+  while(c!==start){
+    usedEdges.unshift(prevEdge[c]);
+    c=prev[c];
+    path.unshift(c);
+  }
+  return {path, usedEdges, total: dist[end]};
+}
+
+/* ===================== 4. UI 구성 ===================== */
+const startSel = document.getElementById('start');
+const endSel = document.getElementById('end');
+const sortedNodes = [...nodeList].sort((a,b)=> (NAMES[a]||a).localeCompare(NAMES[b]||b,'ko'));
+sortedNodes.forEach(n=>{
+  const o1=document.createElement('option'); o1.value=n; o1.textContent=`${NAMES[n]||n} (${n})`;
+  startSel.appendChild(o1);
+  const o2=o1.cloneNode(true);
+  endSel.appendChild(o2);
+});
+startSel.value = "정문";
+endSel.value = "s06 4층";
+
+document.getElementById('swap').addEventListener('click', ()=>{
+  const a=startSel.value; startSel.value=endSel.value; endSel.value=a;
+});
+
+/* ===================== 5. SVG 렌더 ===================== */
+const svg = document.getElementById('map');
+svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
+
+function draw(pathEdgeIds=new Set(), pathNodes=new Set()){
+  svg.innerHTML='';
+  // edges
+  EDGES.forEach(([id,f,t])=>{
+    const p1=pos[f], p2=pos[t];
+    const line=document.createElementNS('http://www.w3.org/2000/svg','line');
+    line.setAttribute('x1',p1.x); line.setAttribute('y1',p1.y);
+    line.setAttribute('x2',p2.x); line.setAttribute('y2',p2.y);
+    line.setAttribute('class', pathEdgeIds.has(id) ? 'edge-path' : 'edge-base');
+    svg.appendChild(line);
+  });
+  // nodes
+  nodeList.forEach(n=>{
+    const p=pos[n];
+    const isPath = pathNodes.has(n);
+    const c=document.createElementNS('http://www.w3.org/2000/svg','circle');
+    c.setAttribute('cx',p.x); c.setAttribute('cy',p.y);
+    c.setAttribute('r', isPath?7:5.2);
+    c.setAttribute('class', 'node-dot' + (isPath?' on-path':''));
+    svg.appendChild(c);
+
+    const label=document.createElementNS('http://www.w3.org/2000/svg','text');
+    label.setAttribute('x',p.x); label.setAttribute('y',p.y-10);
+    label.setAttribute('text-anchor','middle');
+    label.setAttribute('class','node-label'+(isPath?' on-path':''));
+    label.textContent = n;
+    svg.appendChild(label);
+  });
+}
+draw();
+
+/* ===================== 6. 결과 패널 ===================== */
+function slopeTag(slope){
+  if(slope>0) return `<span class="tag up">▲ 오르막 ${slope}</span>`;
+  if(slope<0) return `<span class="tag down">▼ 내리막 ${Math.abs(slope)}</span>`;
+  return `<span class="tag flat">─ 평지</span>`;
+}
+
+function render(result, start, end){
+  const summary = document.getElementById('summary');
+  const steps = document.getElementById('steps');
+
+  if(!result){
+    summary.innerHTML = `<h2>요약</h2><div class="empty">두 지점 사이에 경로가 없습니다.</div>`;
+    steps.innerHTML = '';
+    draw();
+    return;
+  }
+
+  const {path, usedEdges, total} = result;
+  const indoorCount = usedEdges.filter(e=>e.indoor==='Y').length;
+  const upSum = usedEdges.filter(e=>e.slope>0).reduce((s,e)=>s+e.slope,0);
+  const downSum = usedEdges.filter(e=>e.slope<0).reduce((s,e)=>s+Math.abs(e.slope),0);
+
+  summary.innerHTML = `
+    <h2>요약</h2>
+    <div class="stat-row"><span class="k">${NAMES[start]||start} → ${NAMES[end]||end}</span></div>
+    <div class="stat-row"><span class="k">총 소요 시간</span><span class="v">${total}분</span></div>
+    <div class="stat-row"><span class="k">경유 구간 수</span><span class="v">${usedEdges.length}개</span></div>
+    <div class="stat-row"><span class="k">실내 구간</span><span class="v">${indoorCount}개</span></div>
+    <div class="stat-row"><span class="k">누적 오르막</span><span class="v">${upSum}</span></div>
+    <div class="stat-row"><span class="k">누적 내리막</span><span class="v">${downSum}</span></div>
+  `;
+
+  steps.innerHTML = `<h2>턴바이턴 안내</h2>` + usedEdges.map((e,i)=>`
+    <div class="step">
+      <div class="step-idx">${String(i+1).padStart(2,'0')}</div>
+      <div class="step-body">
+        <div class="step-route"><b>${NAMES[path[i]]||path[i]}</b> → <b>${NAMES[path[i+1]]||path[i+1]}</b></div>
+        <div class="step-meta">
+          <span class="tag">${e.id}</span>
+          <span class="tag">${e.time}분</span>
+          <span class="tag">${e.type}</span>
+          ${e.indoor==='Y' ? '<span class="tag indoor">🏠 실내</span>' : ''}
+          ${slopeTag(e.slope)}
+        </div>
+      </div>
+    </div>
+  `).join('') + `
+    <div class="step" style="border-top:1px solid var(--line-dim);">
+      <div class="step-idx">🏁</div>
+      <div class="step-body"><div class="step-route"><b>${NAMES[end]||end}</b> 도착</div></div>
+    </div>
+  `;
+
+  const pathEdgeIds = new Set(usedEdges.map(e=>e.id));
+  const pathNodes = new Set(path);
+  draw(pathEdgeIds, pathNodes);
+}
+
+document.getElementById('go').addEventListener('click', ()=>{
+  const s = startSel.value, e = endSel.value;
+  if(s===e){ render(null, s, e); return; }
+  render(dijkstra(s,e), s, e);
+});
+</script>
+</body>
+</html>
