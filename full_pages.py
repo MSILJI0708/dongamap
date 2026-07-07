@@ -1,5 +1,9 @@
 # -*- coding: utf-8 -*-
-# 통합 도로+엘리베이터+연계 데이터 (단일 소스) -> excel/html 양쪽에 동일하게 사용
+import re
+from itertools import combinations
+
+# 기존 지상 도로(r01~r33) + 건물간 연계(r46~r51)만 유지, 기존 엘리베이터 전용(r34~r45)는
+# "일부 층만 연결"되는 불완전한 데이터였으므로 제거하고 아래에서 전층 연결로 다시 생성
 
 NAMES = {
     "정문":"정문", "108계단":"108계단", "차고지":"차고지", "체대":"체육대학",
@@ -20,8 +24,8 @@ NAMES = {
     "bs04":"산학협력관 버스정류장(BS04)",
 }
 
-# id, from, to, time(분), type, indoor(Y/N), slope
-EDGES = [
+# 지상 도로 (r01~r33) - 변경 없음
+GROUND_EDGES = [
     ("r01","정문","108계단",4,"도보","N",2),
     ("r02","정문","차고지",6,"도보","N",2),
     ("r03","정문","체대",1,"도보","N",1),
@@ -55,22 +59,10 @@ EDGES = [
     ("r31","s12 4층","s06 6층",3,"도보","N",1),
     ("r32","s12 4층","체대2",4,"도보","N",1),
     ("r33","야외정원","s06 4층",1,"도보","N",1),
+]
 
-    # ---- 엘리베이터 (EL01,04,06,07,10,17) : time/slope 미제공 -> 기본값(1분, 경사 0) ----
-    ("r34","s01","s01 4층",1,"엘리베이터","Y",0),                 # EL01
-    ("r35","s04","s04 4층",1,"엘리베이터","Y",0),                 # EL04
-    ("r36","s06지하","s06 2층",1,"엘리베이터","Y",0),              # EL06
-    ("r37","s06지하","s06 6층",1,"엘리베이터","Y",0),              # EL06
-    ("r38","s06 2층","s06 6층",1,"엘리베이터","Y",0),              # EL06
-    ("r39","체대","체대 4층",1,"엘리베이터","Y",0),                # EL07
-    ("r40","체대","체대 7층",1,"엘리베이터","Y",0),                # EL07
-    ("r41","체대 4층","체대 7층",1,"엘리베이터","Y",0),            # EL07
-    ("r42","도서관","도서관 2층",1,"엘리베이터","Y",0),            # EL10
-    ("r43","체대2","체대2 4층",1,"엘리베이터","Y",0),              # EL17
-    ("r44","체대2","체대2 7층",1,"엘리베이터","Y",0),              # EL17
-    ("r45","체대2 4층","체대2 7층",1,"엘리베이터","Y",0),          # EL17
-
-    # ---- 건물 간 연계(브릿지/통로) : time/slope 미제공 -> 기본값(1분, 경사 0, 실내) ----
+# 건물 간 연계 통로 (r46~r51) - 변경 없음, 서로 다른 건물의 특정 층끼리 잇는 브릿지
+BRIDGE_EDGES = [
     ("r46","s12 1층","s05 4층",1,"도보","Y",0),
     ("r47","s12 4층","s05 4층",1,"도보","Y",0),
     ("r48","s05 4층","s06 3층",1,"도보","Y",0),
@@ -79,15 +71,43 @@ EDGES = [
     ("r51","체대2 4층","s12 4층",1,"도보","Y",0),
 ]
 
-# 정문 GPS 앵커 (향후 실제 지도 오버레이용)
-GATE_LATLNG = (35.1159, 128.9673)
+# 엘리베이터가 설치된 건물(기준 이름) - 이 건물들은 전 층이 엘리베이터로 직접 연결
+ELEVATOR_BUILDINGS = {"s01", "s04", "s06", "체대", "도서관", "체대2"}
+
+def base_name(node):
+    return re.sub(r'\s*(지하|\d+층)$', '', node).strip()
+
+# 모든 노드를 건물 기준으로 그룹핑
+all_nodes = set(NAMES.keys())
+groups = {}
+for n in all_nodes:
+    groups.setdefault(base_name(n), []).append(n)
+
+# 건물별로 층이 2개 이상이면, 그 안의 모든 층 쌍을 직접 연결(전 층 상호 이동)
+vertical_edges = []
+rid = 52
+for base, members in sorted(groups.items()):
+    if len(members) < 2:
+        continue
+    is_elevator = base in ELEVATOR_BUILDINGS
+    move_type = "엘리베이터" if is_elevator else "계단"
+    for a, b in combinations(sorted(members), 2):
+        vertical_edges.append((f"r{rid}", a, b, 1, move_type, "Y", 0))
+        rid += 1
+
+EDGES = GROUND_EDGES + BRIDGE_EDGES + vertical_edges
+
+
+GATE_LATLNG = (35.1159, 128.9673)  # 정문 GPS 앵커 (향후 실제 지도 오버레이용)
 
 if __name__ == "__main__":
-    print(f"노드 수(NAMES): {len(NAMES)}")
-    ids_in_edges = set()
-    for e in EDGES:
-        ids_in_edges.add(e[1]); ids_in_edges.add(e[2])
-    print(f"간선에 등장하는 고유 노드 수: {len(ids_in_edges)}")
-    missing = ids_in_edges - set(NAMES.keys())
-    print("NAMES에 없는 노드:", missing if missing else "없음")
-    print(f"간선 수: {len(EDGES)}")
+    print(f"지상 도로: {len(GROUND_EDGES)}개")
+    print(f"건물간 연계: {len(BRIDGE_EDGES)}개")
+    print(f"수직이동(엘리베이터/계단): {len(vertical_edges)}개")
+    print(f"총 간선: {len(EDGES)}개")
+    print(f"총 노드: {len(NAMES)}개")
+    print()
+    for base, members in sorted(groups.items()):
+        if len(members) >= 2:
+            kind = "엘리베이터" if base in ELEVATOR_BUILDINGS else "계단"
+            print(f"  [{kind}] {base}: {members} -> {len(list(combinations(members,2)))}개 간선")
