@@ -1,0 +1,614 @@
+<title>캠퍼스 경로 탐색기</title>
+<style>
+  :root {
+    --bg: #EEF2F0;
+    --surface: #FFFFFF;
+    --surface-2: #F5F8F6;
+    --ink: #16211D;
+    --muted: #56645D;
+    --line: #C7D1CB;
+    --line-strong: #96A69C;
+    --accent: #D9632B;
+    --accent-ink: #7A3413;
+    --accent-soft: #F7E2D3;
+    --radius: 10px;
+    --shadow: 0 1px 2px rgba(22, 33, 29, 0.06), 0 8px 24px -12px rgba(22, 33, 29, 0.18);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0E1512;
+      --surface: #161F1A;
+      --surface-2: #1C2620;
+      --ink: #E7EDE9;
+      --muted: #93A69B;
+      --line: #2B3931;
+      --line-strong: #3E4F44;
+      --accent: #FF8A47;
+      --accent-ink: #FFDCC0;
+      --accent-soft: #3A2415;
+      --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 8px 24px -12px rgba(0, 0, 0, 0.5);
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #0E1512;
+    --surface: #161F1A;
+    --surface-2: #1C2620;
+    --ink: #E7EDE9;
+    --muted: #93A69B;
+    --line: #2B3931;
+    --line-strong: #3E4F44;
+    --accent: #FF8A47;
+    --accent-ink: #FFDCC0;
+    --accent-soft: #3A2415;
+    --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 8px 24px -12px rgba(0, 0, 0, 0.5);
+  }
+  :root[data-theme="light"] {
+    --bg: #EEF2F0;
+    --surface: #FFFFFF;
+    --surface-2: #F5F8F6;
+    --ink: #16211D;
+    --muted: #56645D;
+    --line: #C7D1CB;
+    --line-strong: #96A69C;
+    --accent: #D9632B;
+    --accent-ink: #7A3413;
+    --accent-soft: #F7E2D3;
+    --shadow: 0 1px 2px rgba(22, 33, 29, 0.06), 0 8px 24px -12px rgba(22, 33, 29, 0.18);
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Malgun Gothic", sans-serif;
+    font-size: 15px;
+    line-height: 1.5;
+  }
+
+  .page {
+    max-width: 1120px;
+    margin: 0 auto;
+    padding: 40px 24px 64px;
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+  }
+
+  .masthead {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding-bottom: 16px;
+    border-bottom: 1px solid var(--line);
+  }
+  .eyebrow {
+    font-family: "Cascadia Mono", "SF Mono", Consolas, "Roboto Mono", monospace;
+    font-size: 12px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+  h1 {
+    font-family: "Bahnschrift", "DIN Alternate", "Arial Narrow", sans-serif;
+    font-weight: 700;
+    font-size: 30px;
+    letter-spacing: 0.01em;
+    margin: 0;
+    text-wrap: balance;
+  }
+  .sub {
+    color: var(--muted);
+    font-size: 14px;
+    margin: 2px 0 0;
+  }
+
+  .panel {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+  }
+
+  .controls {
+    padding: 18px 20px;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    gap: 16px;
+  }
+  .field {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    min-width: 200px;
+    flex: 1 1 200px;
+  }
+  .field label {
+    font-family: "Cascadia Mono", "SF Mono", Consolas, monospace;
+    font-size: 11px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+  select {
+    appearance: none;
+    background: var(--surface-2);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 10px 36px 10px 12px;
+    font-size: 14px;
+    color: var(--ink);
+    font-family: inherit;
+    background-image: linear-gradient(45deg, transparent 50%, var(--muted) 50%), linear-gradient(135deg, var(--muted) 50%, transparent 50%);
+    background-position: calc(100% - 18px) center, calc(100% - 13px) center;
+    background-size: 5px 5px, 5px 5px;
+    background-repeat: no-repeat;
+  }
+  select:focus-visible, button:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+  .swap {
+    border: 1px solid var(--line);
+    background: var(--surface-2);
+    color: var(--muted);
+    width: 38px;
+    height: 38px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 16px;
+    line-height: 1;
+    flex: 0 0 auto;
+  }
+  .swap:hover { color: var(--ink); border-color: var(--line-strong); }
+  button.find {
+    background: var(--accent);
+    color: #FFFFFF;
+    border: none;
+    border-radius: 8px;
+    padding: 11px 22px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    flex: 0 0 auto;
+  }
+  button.find:hover { filter: brightness(1.06); }
+
+  .stats {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 1px;
+    background: var(--line);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    overflow: hidden;
+  }
+  .stat {
+    background: var(--surface);
+    padding: 16px 18px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .stat .label {
+    font-size: 11px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--muted);
+    font-family: "Cascadia Mono", "SF Mono", Consolas, monospace;
+  }
+  .stat .value {
+    font-family: "Bahnschrift", "DIN Alternate", sans-serif;
+    font-size: 24px;
+    font-variant-numeric: tabular-nums;
+  }
+  .stat .value .unit {
+    font-size: 14px;
+    color: var(--muted);
+    margin-left: 3px;
+    font-family: -apple-system, "Segoe UI", sans-serif;
+  }
+  .stat.accent .value { color: var(--accent); }
+  .status-ok { color: var(--accent); }
+  .status-bad { color: #C0392B; }
+
+  .layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 300px;
+    gap: 20px;
+    align-items: start;
+  }
+  @media (max-width: 760px) {
+    .layout { grid-template-columns: 1fr; }
+    .stats { grid-template-columns: repeat(2, 1fr); }
+  }
+
+  .diagram-card { padding: 18px 18px 12px; }
+  .card-title {
+    font-family: "Cascadia Mono", "SF Mono", Consolas, monospace;
+    font-size: 11px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin: 0 0 10px;
+  }
+  .diagram-scroll {
+    overflow-x: auto;
+    border-top: 1px solid var(--line);
+    padding-top: 8px;
+  }
+  svg text { font-family: "Cascadia Mono", "SF Mono", Consolas, monospace; }
+  .legend {
+    display: flex;
+    gap: 18px;
+    flex-wrap: wrap;
+    padding: 12px 2px 4px;
+    font-size: 12px;
+    color: var(--muted);
+  }
+  .legend .swatch { display: inline-flex; align-items: center; gap: 6px; }
+  .legend .ln { width: 18px; height: 2px; display: inline-block; background: var(--line-strong); }
+  .legend .ln.hot { background: var(--accent); height: 3px; }
+  .legend .dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; background: var(--surface); border: 2px solid var(--line-strong); }
+  .legend .dot.hot { border-color: var(--accent); background: var(--accent-soft); }
+
+  .route-card { padding: 18px; display: flex; flex-direction: column; gap: 12px; }
+  ol.steps {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+  }
+  ol.steps li {
+    position: relative;
+    padding: 0 0 18px 26px;
+    border-left: 2px solid var(--line);
+  }
+  ol.steps li:last-child { border-left: 2px solid transparent; padding-bottom: 0; }
+  ol.steps li::before {
+    content: attr(data-n);
+    position: absolute;
+    left: -11px;
+    top: -1px;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: var(--surface-2);
+    border: 2px solid var(--line-strong);
+    color: var(--ink);
+    font-family: "Cascadia Mono", "SF Mono", Consolas, monospace;
+    font-size: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  ol.steps li.endpoint::before { border-color: var(--accent); background: var(--accent-soft); color: var(--accent-ink); }
+  .stop-id { font-family: "Cascadia Mono", "SF Mono", Consolas, monospace; font-size: 13px; font-weight: 600; }
+  .stop-name { color: var(--muted); font-size: 12.5px; margin-top: 1px; }
+  .stop-meta { font-size: 11.5px; color: var(--muted); margin-top: 4px; font-variant-numeric: tabular-nums; }
+
+  footer {
+    color: var(--muted);
+    font-size: 12px;
+    border-top: 1px solid var(--line);
+    padding-top: 14px;
+    font-family: "Cascadia Mono", "SF Mono", Consolas, monospace;
+  }
+</style>
+
+<div class="page">
+  <div class="masthead">
+    <div class="eyebrow">nav.roads · 36 segments · nav.places 연동</div>
+    <h1>캠퍼스 경로 탐색기</h1>
+    <p class="sub">동아대학교 승학캠퍼스 도로망에서 두 지점 사이의 최단 경로(거리 기준)를 계산합니다.</p>
+  </div>
+
+  <div class="panel controls">
+    <div class="field">
+      <label for="from">출발지</label>
+      <select id="from"></select>
+    </div>
+    <button class="swap" id="swap" title="출발지·도착지 바꾸기">⇄</button>
+    <div class="field">
+      <label for="to">도착지</label>
+      <select id="to"></select>
+    </div>
+    <button class="find" id="find">경로 찾기</button>
+  </div>
+
+  <div class="stats">
+    <div class="stat accent">
+      <div class="label">총 거리</div>
+      <div class="value" id="statDistance">—</div>
+    </div>
+    <div class="stat">
+      <div class="label">예상 소요시간</div>
+      <div class="value" id="statTime">—</div>
+    </div>
+    <div class="stat">
+      <div class="label">경유 구간</div>
+      <div class="value" id="statHops">—</div>
+    </div>
+    <div class="stat">
+      <div class="label">상태</div>
+      <div class="value" id="statStatus">—</div>
+    </div>
+  </div>
+
+  <div class="layout">
+    <div class="panel diagram-card">
+      <p class="card-title">도로망 다이어그램 — 강조된 선이 현재 경로</p>
+      <div class="diagram-scroll">
+        <svg id="diagram" viewBox="0 0 1000 640" xmlns="http://www.w3.org/2000/svg"></svg>
+      </div>
+      <div class="legend">
+        <span class="swatch"><span class="ln"></span> 도로</span>
+        <span class="swatch"><span class="ln hot"></span> 최단 경로</span>
+        <span class="swatch"><span class="dot"></span> 지점</span>
+        <span class="swatch"><span class="dot hot"></span> 경로상 지점</span>
+      </div>
+    </div>
+
+    <div class="panel route-card">
+      <p class="card-title">경로 상세</p>
+      <ol class="steps" id="steps"></ol>
+    </div>
+  </div>
+
+  <footer>SOURCE — MySQL nav.roads (road_id, from_place, to_place, road_type, distance, time), nav.places 지점명 조인</footer>
+</div>
+
+<script>
+  const rawEdges = [
+    [1,'GATE','PL00','차도',92,1],
+    [2,'PL00','CR01-02','차도',136,2],
+    [3,'CR01-02','PL01','차도',82,1],
+    [4,'PL01','PL07','차도',125,1],
+    [5,'PL07','CR07','차도',75,1],
+    [6,'CR07','GATE','차도',216,3],
+    [7,'CR07','CR08','차도',67,1],
+    [8,'CR08','CR09','차도',17,1],
+    [9,'CR09','S09','차도',53,2],
+    [10,'CR08','S08-01F','차도',88,1],
+    [11,'CR09','S17-B1F','차도',70,1],
+    [12,'CR09','S10-02F','차도',43,1],
+    [13,'S10-02F','S04-B1','차도',115,1],
+    [14,'S04-B1','PL03','차도',65,1],
+    [15,'PL03','S02-01F01E','차도',43,1],
+    [16,'S02-01F01E','S02-B1F01E','차도',20,1],
+    [17,'S02-B1F01E','CR02','차도',34,1],
+    [18,'CR02','PL01','차도',40,1],
+    [19,'CR02','PL07','차도',116,2],
+    [20,'S04-B1','PL04','차도',37,1],
+    [21,'PL04','PL12','차도',56,1],
+    [22,'PL04','S05-01F02E','차도',50,1],
+    [23,'S05-01F02E','PL06-02','차도',67,1],
+    [24,'PL06-02','PL06-01','차도',73,1],
+    [25,'PL06-01','S05-01F02E','차도',83,1],
+    [26,'PL04','S12-02F01E','차도',50,1],
+    [27,'S12-02F01E','CR05','차도',32,1],
+    [28,'CR05','S12-04F01E','차도',40,1],
+    [29,'CR05','S05-04F01E','차도',36,1],
+    [30,'S12-04F01E','PL17','차도',59,1],
+    [31,'CR05','S06-06F03E','차도',68,1],
+    [32,'BS06','S06-06F03E','차도',16,1],
+    [33,'BS06','S06-06F01E','차도',31,1],
+    [34,'CR12','PL19','차도',50,1],
+    [35,'CR12','PL06-03','차도',75,1],
+    [36,'CR12','S06-06F01E','차도',45,1],
+  ].map(([id, from, to, type, distance, time]) => ({ id, from, to, type, distance, time }));
+
+  const placeNames = {
+    'GATE': '정문', 'BS06': '산학협력관 버스정류장', 'CR01-02': '108계단 (S01 앞)',
+    'CR02': 'S01 S02 주차장', 'CR05': 'S05 S12 S06', 'CR07': 'S07 주차장 입구(동편)', 'CR08': '주차장 S08-S10',
+    'CR09': 'S10- S17/S09', 'S02-01F01E': '학생회관 1층 출입구(학생식당)',
+    'S02-B1F01E': '학생회관 지하1층 출입구(보건실, 서점)', 'S04-B1': '공대2호관 지하1층 출입구',
+    'S05-01F02E': '공대 4호관 1층 출입구(흡연장)', 'S05-04F01E': '공대 4호관 4층 S12방향 입구',
+    'S06-06F01E': '공대 5호관 6층 출입구(정문)',
+    'S06-06F03E': '공대 5호관 6층 출입구(버스정류장)', 'S08-01F': '정문 105번(출판부 사무실) 입구',
+    'S09': '생명자연과학대학 및 건강과학대학',
+  };
+
+  const nodes = Array.from(new Set(rawEdges.flatMap(e => [e.from, e.to]))).sort();
+
+  const adj = {};
+  nodes.forEach(n => adj[n] = []);
+  rawEdges.forEach(e => {
+    adj[e.from].push({ to: e.to, distance: e.distance, time: e.time });
+    adj[e.to].push({ to: e.from, distance: e.distance, time: e.time });
+  });
+
+  function dijkstra(start, end) {
+    const dist = {}, prev = {}, visited = new Set();
+    nodes.forEach(n => dist[n] = Infinity);
+    dist[start] = 0;
+    const queue = new Set(nodes);
+    while (queue.size) {
+      let u = null, best = Infinity;
+      for (const n of queue) if (dist[n] < best) { best = dist[n]; u = n; }
+      if (u === null) break;
+      queue.delete(u);
+      if (u === end) break;
+      for (const { to, distance } of adj[u]) {
+        if (visited.has(to)) continue;
+        const alt = dist[u] + distance;
+        if (alt < dist[to]) { dist[to] = alt; prev[to] = u; }
+      }
+      visited.add(u);
+    }
+    if (dist[end] === Infinity) return null;
+    const path = [end];
+    let cur = end;
+    while (cur !== start) { cur = prev[cur]; path.unshift(cur); }
+    let totalTime = 0;
+    for (let i = 0; i < path.length - 1; i++) {
+      const edge = adj[path[i]].find(e => e.to === path[i + 1]);
+      totalTime += edge.time;
+    }
+    return { path, distance: dist[end], time: totalTime };
+  }
+
+  // ---- layout: BFS spanning layout per connected component ----
+  function buildLayout() {
+    const visitedAll = new Set();
+    const positions = {};
+    const treeEdges = [];
+    let rowCursor = 0;
+    const componentGapRows = 1;
+
+    for (const start of nodes) {
+      if (visitedAll.has(start)) continue;
+      const parent = {};
+      const depth = { [start]: 0 };
+      const order = [start];
+      visitedAll.add(start);
+      for (let i = 0; i < order.length; i++) {
+        const u = order[i];
+        for (const { to } of adj[u]) {
+          if (!visitedAll.has(to)) {
+            visitedAll.add(to);
+            parent[to] = u;
+            depth[to] = depth[u] + 1;
+            treeEdges.push([u, to]);
+            order.push(to);
+          }
+        }
+      }
+      const children = {};
+      order.forEach(n => children[n] = []);
+      order.forEach(n => { if (parent[n] !== undefined) children[parent[n]].push(n); });
+
+      const localRow = {};
+      let leafCursor = rowCursor;
+      function place(n) {
+        const kids = children[n];
+        if (kids.length === 0) {
+          localRow[n] = leafCursor;
+          leafCursor += 1;
+          return localRow[n];
+        }
+        const ys = kids.map(place);
+        localRow[n] = (Math.min(...ys) + Math.max(...ys)) / 2;
+        return localRow[n];
+      }
+      place(start);
+      order.forEach(n => positions[n] = { depth: depth[n], row: localRow[n] });
+      rowCursor = leafCursor + componentGapRows;
+    }
+    return { positions, treeEdges, rowCount: rowCursor };
+  }
+
+  const { positions, treeEdges, rowCount } = buildLayout();
+
+  function renderDiagram(pathSet, edgeKeySet) {
+    const svg = document.getElementById('diagram');
+    const xGap = 88, yGap = 46, padL = 66, padT = 26;
+    const maxDepth = Math.max(...Object.values(positions).map(p => p.depth));
+    const width = padL + maxDepth * xGap + 140;
+    const height = padT * 2 + rowCount * yGap;
+    svg.setAttribute('viewBox', `0 0 ${width} ${height}`);
+
+    const css = getComputedStyle(document.documentElement);
+    const lineColor = css.getPropertyValue('--line-strong').trim();
+    const accent = css.getPropertyValue('--accent').trim();
+    const surface = css.getPropertyValue('--surface').trim();
+    const surface2 = css.getPropertyValue('--surface-2').trim();
+    const accentSoft = css.getPropertyValue('--accent-soft').trim();
+    const ink = css.getPropertyValue('--ink').trim();
+    const muted = css.getPropertyValue('--muted').trim();
+
+    const xy = n => [padL + positions[n].depth * xGap, padT + positions[n].row * yGap];
+
+    let svgContent = '';
+    treeEdges.forEach(([a, b]) => {
+      const [x1, y1] = xy(a), [x2, y2] = xy(b);
+      const hot = edgeKeySet.has(a + '|' + b) || edgeKeySet.has(b + '|' + a);
+      svgContent += `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${hot ? accent : lineColor}" stroke-width="${hot ? 3 : 1.4}" />`;
+    });
+    nodes.forEach(n => {
+      const [x, y] = xy(n);
+      const hot = pathSet.has(n);
+      const label = placeNames[n] ? `${n} · ${placeNames[n]}` : n;
+      svgContent += `<g>
+        <title>${label}</title>
+        <circle cx="${x}" cy="${y}" r="${hot ? 6 : 4}" fill="${hot ? accentSoft : surface}" stroke="${hot ? accent : lineColor}" stroke-width="${hot ? 2.5 : 1.6}" />
+        <text x="${x + (hot ? 10 : 8)}" y="${y + 3.5}" font-size="10.5" fill="${hot ? ink : muted}" font-weight="${hot ? 700 : 400}">${n}</text>
+      </g>`;
+    });
+    svg.innerHTML = svgContent;
+  }
+
+  function populateSelect(sel, selected) {
+    sel.innerHTML = nodes.map(n => {
+      const label = placeNames[n] ? `${n} — ${placeNames[n]}` : n;
+      return `<option value="${n}" ${n === selected ? 'selected' : ''}>${label}</option>`;
+    }).join('');
+  }
+
+  const fromSel = document.getElementById('from');
+  const toSel = document.getElementById('to');
+  populateSelect(fromSel, 'GATE');
+  populateSelect(toSel, 'PL17');
+
+  function renderResult() {
+    const start = fromSel.value, end = toSel.value;
+    const result = start === end ? { path: [start], distance: 0, time: 0 } : dijkstra(start, end);
+
+    const statDistance = document.getElementById('statDistance');
+    const statTime = document.getElementById('statTime');
+    const statHops = document.getElementById('statHops');
+    const statStatus = document.getElementById('statStatus');
+    const steps = document.getElementById('steps');
+
+    if (!result) {
+      statDistance.innerHTML = '—';
+      statTime.innerHTML = '—';
+      statHops.innerHTML = '—';
+      statStatus.innerHTML = '<span class="status-bad">경로 없음</span>';
+      steps.innerHTML = '<li>두 지점을 연결하는 도로가 없습니다.</li>';
+      renderDiagram(new Set(), new Set());
+      return;
+    }
+
+    statDistance.innerHTML = `${result.distance}<span class="unit">m</span>`;
+    statTime.innerHTML = `${result.time}<span class="unit">분</span>`;
+    statHops.innerHTML = `${result.path.length - 1}<span class="unit">구간</span>`;
+    statStatus.innerHTML = '<span class="status-ok">경로 있음</span>';
+
+    let cumDist = 0, cumTime = 0;
+    steps.innerHTML = result.path.map((n, i) => {
+      let meta = '';
+      if (i > 0) {
+        const prev = result.path[i - 1];
+        const edge = adj[prev].find(e => e.to === n);
+        cumDist += edge.distance;
+        cumTime += edge.time;
+        meta = `<div class="stop-meta">+${edge.distance}m · +${edge.time}분 (누적 ${cumDist}m · ${cumTime}분)</div>`;
+      }
+      const endpoint = (i === 0 || i === result.path.length - 1) ? 'endpoint' : '';
+      const name = placeNames[n] ? `<div class="stop-name">${placeNames[n]}</div>` : '';
+      return `<li class="${endpoint}" data-n="${i === 0 ? '출' : (i === result.path.length - 1 ? '착' : i)}">
+        <div class="stop-id">${n}</div>
+        ${name}
+        ${meta}
+      </li>`;
+    }).join('');
+
+    const pathSet = new Set(result.path);
+    const edgeKeySet = new Set();
+    for (let i = 0; i < result.path.length - 1; i++) edgeKeySet.add(result.path[i] + '|' + result.path[i + 1]);
+    renderDiagram(pathSet, edgeKeySet);
+  }
+
+  document.getElementById('find').addEventListener('click', renderResult);
+  document.getElementById('swap').addEventListener('click', () => {
+    const a = fromSel.value, b = toSel.value;
+    fromSel.value = b; toSel.value = a;
+    renderResult();
+  });
+
+  renderResult();
+</script>
