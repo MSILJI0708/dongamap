@@ -238,6 +238,27 @@
     background: #fdecea; border: 1px solid #f5c6cb; border-radius: 8px;
     padding: 7px 10px; margin-bottom: 8px;
   }
+
+  .edge-context-menu {
+    display: none; position: fixed; z-index: 30;
+    background: var(--surface-1); border: 1px solid var(--border-ring);
+    border-radius: 10px; padding: 6px; box-shadow: 0 6px 20px rgba(0,0,0,0.2);
+    min-width: 180px; flex-direction: column; gap: 2px;
+  }
+  .edge-context-menu-label {
+    font-size: 10.5px; color: var(--text-muted); padding: 4px 8px 2px;
+  }
+  .edge-context-menu button {
+    display: flex; align-items: center; gap: 8px;
+    width: 100%; text-align: left; background: none; border: none; cursor: pointer;
+    font-size: 12.5px; color: var(--text-primary); padding: 7px 8px; border-radius: 6px;
+  }
+  .edge-context-menu button:hover { background: rgba(42,120,214,0.1); }
+  .edge-context-menu button.current { font-weight: 700; color: var(--series-1); cursor: default; }
+  .edge-context-menu button .sw { width: 16px; height: 3px; border-radius: 2px; flex: 0 0 auto; }
+  .edge-context-menu button .sw.traffic { background: #1e8e3e; }
+  .edge-context-menu button .sw.walk { background: #1a56db; }
+  .edge-context-menu button .sw.mixed { background: linear-gradient(to right, #1e8e3e 50%, #1a56db 50%); }
 </style>
 </head>
 <body>
@@ -440,6 +461,13 @@
 <div class="attribution">© Kakao Corp.</div>
 <div class="tooltip" id="tooltip"></div>
 
+<div class="edge-context-menu" id="edgeContextMenu">
+  <div class="edge-context-menu-label">경로망 종류 변경</div>
+  <button data-cat="교통경로망"><span class="sw traffic"></span>교통경로망 (차도)</button>
+  <button data-cat="도보경로망"><span class="sw walk"></span>도보경로망 (인도)</button>
+  <button data-cat="혼합경로망"><span class="sw mixed"></span>교통+도보 경로망 (혼합)</button>
+</div>
+
 <script src="https://dapi.kakao.com/v2/maps/sdk.js?appkey=555053101d1712e21f2bc07dfa63bf69&autoload=false" onerror="document.getElementById('sdkError').style.display='block'"></script>
 <div id="sdkError" style="display:none; position:absolute; top:14px; left:50%; transform:translateX(-50%); z-index:9; background:#fdecea; color:#611a15; border:1px solid #f5c6cb; border-radius:8px; padding:10px 16px; font-family:system-ui; font-size:13px;">
   카카오맵 SDK 스크립트 로드에 실패했습니다 (네트워크 차단 또는 잘못된 키).
@@ -620,6 +648,14 @@ kakao.maps.load(async function () {
     return map.getProjection().coordsFromContainerPoint(point);
   }
 
+  function clientPointFromLatLng(latlng) {
+    const rect = mapDiv.getBoundingClientRect();
+    const point = map.getProjection().containerPointFromCoords(latlng);
+    return { x: rect.left + point.x, y: rect.top + point.y };
+  }
+
+  mapDiv.addEventListener('contextmenu', (domEvent) => domEvent.preventDefault());
+
   function onPickMove(domEvent) {
     const wasHidden = magnifierEl.style.display !== 'block';
     const latlng = latLngFromClientPoint(domEvent.clientX, domEvent.clientY);
@@ -698,6 +734,11 @@ kakao.maps.load(async function () {
       });
     }
 
+    function onEdgeRightClick(mouseEvent) {
+      const pt = clientPointFromLatLng(mouseEvent.latLng);
+      showEdgeContextMenu(e, pt.x, pt.y);
+    }
+
     let polyline, mixedWalkLine = null;
     if (isMixed) {
       polyline = new kakao.maps.Polyline({
@@ -728,6 +769,9 @@ kakao.maps.load(async function () {
         }
       }
     };
+
+    kakao.maps.event.addListener(polyline, 'rightclick', onEdgeRightClick);
+    if (mixedWalkLine) kakao.maps.event.addListener(mixedWalkLine, 'rightclick', onEdgeRightClick);
 
     if (!isTraffic && !isWalk) return;
 
@@ -849,6 +893,63 @@ kakao.maps.load(async function () {
       });
     }
   }
+  const edgeContextMenu = document.getElementById('edgeContextMenu');
+  let contextMenuEdge = null;
+  const CATEGORY_ROAD_TYPE = { '교통경로망': '차도', '도보경로망': '인도', '혼합경로망': '혼합' };
+
+  function showEdgeContextMenu(edge, x, y) {
+    contextMenuEdge = edge;
+    edgeContextMenu.style.display = 'flex';
+    const menuRect = edgeContextMenu.getBoundingClientRect();
+    edgeContextMenu.style.left = Math.min(x, window.innerWidth - menuRect.width - 8) + 'px';
+    edgeContextMenu.style.top = Math.min(y, window.innerHeight - menuRect.height - 8) + 'px';
+    edgeContextMenu.querySelectorAll('button').forEach(btn => {
+      btn.classList.toggle('current', btn.dataset.cat === edge.category);
+    });
+  }
+  function hideEdgeContextMenu() {
+    edgeContextMenu.style.display = 'none';
+    contextMenuEdge = null;
+  }
+  function changeEdgeCategory(edge, newCategory) {
+    const from = edge.from, to = edge.to, dist = edge.dist, time = edge.time;
+    fetch('/api/edge', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ from, to, category: newCategory, road_type: CATEGORY_ROAD_TYPE[newCategory], dist, time })
+    }).then(r => r.json().then(body => ({ status: r.status, body }))).then(({ status, body }) => {
+      if (status !== 200) {
+        showTip(`<b>변경 실패</b><br><span class="t-id">${body.error}</span>`);
+        setTimeout(hideTip, 1800);
+        return;
+      }
+      removeEdgeFromMap(from, to);
+      const newEdge = { from, to, dist, time, category: newCategory };
+      if (body.curve) newEdge.curve = body.curve;
+      data.edges.push(newEdge);
+      addEdge(from, to, dist, time);
+      addEdgeToMap(newEdge);
+      applyFocusMode();
+      showTip(`<b>변경됨</b><br><span class="t-id">${from} → ${to} · ${newCategory}</span>`);
+      setTimeout(hideTip, 1400);
+    }).catch(err => {
+      showTip(`<b>변경 실패</b><br><span class="t-id">${err.message}</span>`);
+      setTimeout(hideTip, 1800);
+    });
+  }
+  edgeContextMenu.querySelectorAll('button').forEach(btn => {
+    btn.addEventListener('click', () => {
+      if (!contextMenuEdge) return;
+      const newCat = btn.dataset.cat;
+      if (newCat !== contextMenuEdge.category) changeEdgeCategory(contextMenuEdge, newCat);
+      hideEdgeContextMenu();
+    });
+  });
+  document.addEventListener('click', (domEvent) => {
+    if (!edgeContextMenu.contains(domEvent.target)) hideEdgeContextMenu();
+  });
+  document.addEventListener('keydown', (domEvent) => { if (domEvent.key === 'Escape') hideEdgeContextMenu(); });
+
   data.edges.forEach(addEdgeToMap);
 
   const placeDotOverlays = {};
