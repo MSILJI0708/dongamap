@@ -648,9 +648,16 @@ kakao.maps.load(async function () {
     return map.getProjection().coordsFromContainerPoint(point);
   }
 
+  function pointXY(pt) {
+    return {
+      x: typeof pt.getX === 'function' ? pt.getX() : pt.x,
+      y: typeof pt.getY === 'function' ? pt.getY() : pt.y,
+    };
+  }
+
   function clientPointFromLatLng(latlng) {
     const rect = mapDiv.getBoundingClientRect();
-    const point = map.getProjection().containerPointFromCoords(latlng);
+    const point = pointXY(map.getProjection().containerPointFromCoords(latlng));
     return { x: rect.left + point.x, y: rect.top + point.y };
   }
 
@@ -734,11 +741,6 @@ kakao.maps.load(async function () {
       });
     }
 
-    function onEdgeRightClick(mouseEvent) {
-      const pt = clientPointFromLatLng(mouseEvent.latLng);
-      showEdgeContextMenu(e, pt.x, pt.y);
-    }
-
     let polyline, mixedWalkLine = null;
     if (isMixed) {
       polyline = new kakao.maps.Polyline({
@@ -769,9 +771,6 @@ kakao.maps.load(async function () {
         }
       }
     };
-
-    kakao.maps.event.addListener(polyline, 'rightclick', onEdgeRightClick);
-    if (mixedWalkLine) kakao.maps.event.addListener(mixedWalkLine, 'rightclick', onEdgeRightClick);
 
     if (!isTraffic && !isWalk) return;
 
@@ -949,6 +948,42 @@ kakao.maps.load(async function () {
     if (!edgeContextMenu.contains(domEvent.target)) hideEdgeContextMenu();
   });
   document.addEventListener('keydown', (domEvent) => { if (domEvent.key === 'Escape') hideEdgeContextMenu(); });
+
+  // ---- right-click hit-testing: Kakao Polyline overlays don't reliably fire their own
+  // 'rightclick' event, so listen on the map instead and find the nearest edge in screen pixels ----
+  function pointToSegmentDistPx(p, a, b) {
+    const dx = b.x - a.x, dy = b.y - a.y;
+    const len2 = dx * dx + dy * dy;
+    let t = len2 === 0 ? 0 : ((p.x - a.x) * dx + (p.y - a.y) * dy) / len2;
+    t = Math.max(0, Math.min(1, t));
+    const cx = a.x + t * dx, cy = a.y + t * dy;
+    return Math.hypot(p.x - cx, p.y - cy);
+  }
+  function findNearestEdge(latlng) {
+    const proj = map.getProjection();
+    const clickPt = pointXY(proj.containerPointFromCoords(latlng));
+    let best = null, bestDist = Infinity;
+    data.edges.forEach(edge => {
+      const a = byId[edge.from], b = byId[edge.to];
+      if (!a || !b) return;
+      const curve = edge.curve || 0;
+      const pathLatLngs = curve
+        ? curvedLatLngs(a.lat, a.lon, b.lat, b.lon, curve)
+        : [new kakao.maps.LatLng(a.lat, a.lon), new kakao.maps.LatLng(b.lat, b.lon)];
+      const pathPts = pathLatLngs.map(ll => pointXY(proj.containerPointFromCoords(ll)));
+      for (let i = 0; i < pathPts.length - 1; i++) {
+        const d = pointToSegmentDistPx(clickPt, pathPts[i], pathPts[i + 1]);
+        if (d < bestDist) { bestDist = d; best = edge; }
+      }
+    });
+    return bestDist <= 10 ? best : null;
+  }
+  kakao.maps.event.addListener(map, 'rightclick', (mouseEvent) => {
+    const edge = findNearestEdge(mouseEvent.latLng);
+    if (!edge) return;
+    const pt = clientPointFromLatLng(mouseEvent.latLng);
+    showEdgeContextMenu(edge, pt.x, pt.y);
+  });
 
   data.edges.forEach(addEdgeToMap);
 
