@@ -34,28 +34,88 @@
     box-shadow: 0 4px 14px rgba(0,0,0,0.12);
     cursor: pointer; font-size: 15px; line-height: 1; color: var(--text-secondary);
     display: flex; align-items: center; justify-content: center; padding: 0;
-    transition: left 0.25s ease, top 0.25s ease, transform 0.25s ease;
+    transition: left 0.25s ease, right 0.25s ease, top 0.25s ease, transform 0.25s ease;
   }
   .panel-toggle.collapsed { left: 14px; transform: rotate(180deg); }
 
-  .panel-right { left: auto; right: 14px; max-width: 300px; max-height: 82vh; overflow-y: auto; }
+  /* fixed top-right regardless of the top bar's height — layered above it
+     (higher z-index) rather than pushed below it, per explicit request. */
+  .panel-right { left: auto; right: 14px; max-width: 300px; max-height: 82vh; overflow-y: auto; z-index: 7; }
   .panel-right.collapsed { transform: translateX(120%); }
-  .panel-toggle-right { left: auto; right: 316px; transform: none; }
-  .panel-toggle-right.collapsed { right: 14px; transform: rotate(180deg); }
+  /* pinned to the screen's fixed top-right corner (nudged in slightly closer
+     to the very corner than the panel's own edge) at all times — z-index
+     above the panel itself so it stays visible/clickable whether the panel
+     is open or collapsed, and never jumps to a different offset. */
+  .panel-toggle-right { top: 8px; left: auto; right: 8px; transform: none; z-index: 8; }
+  /* .panel-toggle.collapsed (above) sets left:14px + rotate(180deg) for the
+     *other* (left-side, arrow-style) toggle button, and has higher specificity
+     than .panel-toggle-right's own left/transform — so without this override
+     it wins both properties when this button is also collapsed: it jumps to
+     the left edge (left wins over right when both are set) and spins the
+     pencil icon. Forced back to its fixed spot with no rotation. */
+  .panel-toggle-right.collapsed { left: auto; right: 8px; transform: none; }
 
+  /* top bar variant: the left "길찾기" panel spans the top of the screen
+     instead of floating at top-left, but only half the width — full width
+     left most of the bar empty background with no content in it. */
   .panel-top {
-    top: 0; left: 0; right: 0; max-width: none; width: 100%;
+    /* width:auto (no right) on an absolutely positioned box triggers the
+       standard CSS2.1 shrink-to-fit algorithm — more reliably supported
+       across browsers than the "fit-content" keyword, which wasn't actually
+       shrinking this box in testing. Eliminates the empty trailing space
+       after the last item (e.g. on/off settings) when content doesn't need
+       the full 60%, while still capping/wrapping at 60% if it needs more. */
+    top: 0; left: 0; width: auto; max-width: 60%;
     border-radius: 0 0 12px 12px;
-    display: flex; align-items: flex-start; flex-wrap: wrap; gap: 6px 20px;
+    display: flex; align-items: flex-start; flex-wrap: wrap; gap: 0px 8px;
+    /* hidden until fitTopBarWidth() sizes it correctly once on load — without
+       this, the box briefly flashes at the wide max-width:60% CSS default
+       before JS shrinks it down. visibility (not display) so layout/measurement
+       still happens normally while it's hidden. */
+    visibility: hidden;
   }
   .panel-top.collapsed { transform: translateY(-120%); }
-  .panel-top h1 { width: 100%; }
+  /* left-aligned so it sits directly above the picker/출발지 field below it
+     (both anchored at the box's left edge) — button group stays pinned right. */
+  .title-row { width: 100%; position: relative; display: flex; align-items: center; gap: 10px; }
+  .panel-top .title-row h1 { margin: 0 0 0 50px; }
+  /* position:absolute + right:0 anchors this to the row's actual right edge
+     without depending on the row's width at measurement time — unlike
+     justify-content:space-between, which pushes the button to wherever the
+     box's *current* (pre-shrink) width happens to be, undoing fitTopBarWidth's
+     "measure content, then shrink the box" logic and bringing back the gap. */
+  .maptype-toggle { position: absolute; right: 0; top: 50%; transform: translateY(-50%); display: flex; gap: 4px; }
+  .maptype-btn {
+    font-size: 11px; padding: 4px 10px; border-radius: 999px; cursor: pointer;
+    border: 1px solid var(--border-ring); background: #fff; color: var(--text-secondary);
+  }
+  .maptype-btn.active { background: var(--series-1); color: #fff; border-color: var(--series-1); }
+  /* back to plain in-flow positioning at the row's right end (title-row's
+     own justify-content:space-between) for both windowed and full-screen —
+     now that the box width is fitted by JS (fitTopBarWidth), this button
+     being back in normal flow no longer drags the box wider than it should. */
   .panel-top .picker { width: 300px; flex: 0 0 auto; }
-  .panel-top .legend { flex: 0 0 auto; min-width: 240px; border-top: none; padding-top: 0; margin-top: 0; }
+  /* on/off 설정 4개를 출발/도착 입력과 범례 사이, 한 줄에 1개씩(가로줄 4개)
+     세로로 나열 — settings-row가 picker 바로 다음 자리에 고정되어 있어
+     결과가 뜨거나 사라져도 밀리지 않는다. */
+  .settings-row {
+    flex: 0 0 auto; display: flex; flex-direction: column; gap: 4px;
+  }
+  .panel-top .legend { flex: 0 0 auto; border-top: none; padding-top: 0; margin-top: 0; }
   .panel-top .curve-toggle-row { flex: 0 0 auto; margin-top: 0; }
 
-  .panel-toggle-top { left: 14px; transform: rotate(180deg); }
-  .panel-toggle-top.collapsed { top: 14px !important; transform: none; }
+  /* map icon now (not an arrow), so no rotate-flip needed — fixed at the
+     top-left corner at all times instead of being pushed down by JS to clear
+     the bar's variable height. Nudged closer to the very corner (rather than
+     the panel's own top:14/left:14 edge) so it sits above the title text
+     instead of covering it. */
+  .panel-toggle-top { top: 2px; left: 2px; transform: none; }
+  /* .panel-toggle.collapsed (base rule) sets left:14px + rotate(180deg) for
+     the arrow-style toggle it was originally written for, and has higher
+     specificity than .panel-toggle-top's own left/transform — so without this
+     override, collapsing this button both shifted its position (2px→14px)
+     and spun the map icon. Forced back to the fixed corner spot, no rotation. */
+  .panel-toggle-top.collapsed { top: 2px; left: 2px; transform: none; }
 
   .group-header {
     font-size: 13px; font-weight: 700; color: var(--text-primary); cursor: pointer;
@@ -234,31 +294,44 @@
   }
   .find-btn:hover { opacity: 0.92; }
   .route-error {
-    display: none; font-size: 12.5px; color: #b3261e;
-    background: #fdecea; border: 1px solid #f5c6cb; border-radius: 8px;
-    padding: 7px 10px; margin-bottom: 8px;
+    display: none; font-size: 11px; color: #b3261e; margin-top: 4px;
   }
 
-  .edge-context-menu {
-    display: none; position: fixed; z-index: 30;
+  /* quick-access box, separate from the main "경로 찾기" top bar — searches and
+     routes between tmp (temporary/working) nodes only, which the main
+     route-finder's inputs deliberately exclude. */
+  .tmp-finder {
+    position: absolute; bottom: 20px; left: 10px; z-index: 6; width: 220px;
     background: var(--surface-1); border: 1px solid var(--border-ring);
-    border-radius: 10px; padding: 6px; box-shadow: 0 6px 20px rgba(0,0,0,0.2);
-    min-width: 180px; flex-direction: column; gap: 2px;
+    border-radius: 10px; padding: 8px 10px; box-shadow: 0 4px 14px rgba(0,0,0,0.12);
+    transition: transform 0.25s ease;
   }
-  .edge-context-menu-label {
-    font-size: 10.5px; color: var(--text-muted); padding: 4px 8px 2px;
+  .tmp-finder.collapsed { transform: translateX(-120%); }
+  /* sits just right of the box so it stays put (and clickable) when the box
+     itself slides away to the left — same idea as the other panel toggles. */
+  .tmp-finder-toggle {
+    position: absolute; bottom: 20px; left: 240px; z-index: 7;
+    width: 24px; height: 24px; border-radius: 50%;
+    border: 1px solid var(--border-ring); background: var(--surface-1);
+    box-shadow: 0 4px 14px rgba(0,0,0,0.12);
+    cursor: pointer; font-size: 13px; line-height: 1; color: var(--text-secondary);
+    display: flex; align-items: center; justify-content: center; padding: 0;
+    transition: left 0.25s ease, transform 0.25s ease;
   }
-  .edge-context-menu button {
-    display: flex; align-items: center; gap: 8px;
-    width: 100%; text-align: left; background: none; border: none; cursor: pointer;
-    font-size: 12.5px; color: var(--text-primary); padding: 7px 8px; border-radius: 6px;
+  .tmp-finder-toggle.collapsed { left: 14px; transform: rotate(180deg); }
+  .tmp-finder-label { font-size: 11.5px; font-weight: 700; color: var(--text-primary); margin-bottom: 6px; }
+  .tmp-finder-row { display: flex; align-items: center; gap: 6px; margin-bottom: 6px; }
+  .tmp-finder-row input {
+    flex: 1 1 auto; width: 100%; font-size: 12px; padding: 5px 7px;
+    border: 1px solid var(--border-ring); border-radius: 7px; background: #fff; color: var(--text-primary);
   }
-  .edge-context-menu button:hover { background: rgba(42,120,214,0.1); }
-  .edge-context-menu button.current { font-weight: 700; color: var(--series-1); cursor: default; }
-  .edge-context-menu button .sw { width: 16px; height: 3px; border-radius: 2px; flex: 0 0 auto; }
-  .edge-context-menu button .sw.traffic { background: #1e8e3e; }
-  .edge-context-menu button .sw.walk { background: #1a56db; }
-  .edge-context-menu button .sw.mixed { background: linear-gradient(to right, #1e8e3e 50%, #1a56db 50%); }
+  .tmp-finder-btn {
+    width: 100%; background: var(--series-1); color: #fff; border: none; border-radius: 7px;
+    padding: 6px 0; font-size: 12px; font-weight: 600; cursor: pointer;
+  }
+  .tmp-finder-msg { font-size: 10.5px; min-height: 13px; margin-top: 4px; }
+  .tmp-finder-msg.err { color: #b3261e; }
+  .tmp-finder-msg.ok { color: #0ca30c; }
 </style>
 </head>
 <body>
@@ -270,9 +343,30 @@
   <div class="magnifier-crosshair"></div>
 </div>
 
-<button class="panel-toggle panel-toggle-top" id="panelToggle" aria-label="패널 접기/펴기" title="패널 접기/펴기">◴</button>
+<button class="tmp-finder-toggle" id="tmpFinderToggle" aria-label="tmp 경로 찾기 접기/펼치기" title="tmp 경로 찾기 접기/펼치기" style="display:none">◂</button>
+<div class="tmp-finder" id="tmpFinder" style="display:none">
+  <div class="tmp-finder-label">tmp 경로 찾기</div>
+  <div class="tmp-finder-row">
+    <input type="text" id="tmpFromInput" list="tmpPlaceList" placeholder="출발 tmp 검색" autocomplete="off">
+  </div>
+  <div class="tmp-finder-row">
+    <input type="text" id="tmpToInput" list="tmpPlaceList" placeholder="도착 tmp 검색" autocomplete="off">
+    <button class="swap-btn" id="tmpSwapBtn" type="button" title="출발지/목적지 바꾸기">⇄</button>
+  </div>
+  <datalist id="tmpPlaceList"></datalist>
+  <button class="tmp-finder-btn" id="tmpFindBtn" type="button">경로 찾기</button>
+  <div class="tmp-finder-msg" id="tmpFindMsg"></div>
+</div>
+
+<button class="panel-toggle panel-toggle-top" id="panelToggle" aria-label="패널 접기/펼치기" title="패널 접기/펼치기">🗺️</button>
 <div class="panel panel-top" id="panel">
-  <h1>동아대학교 캠퍼스 길찾기</h1>
+  <div class="title-row">
+    <h1>동아대학교 캠퍼스 길찾기</h1>
+    <div class="maptype-toggle" id="mapTypeToggle">
+      <button type="button" class="maptype-btn active" data-type="roadmap">지도</button>
+      <button type="button" class="maptype-btn" data-type="skyview">스카이뷰</button>
+    </div>
+  </div>
 
   <div class="picker">
     <div class="picker-row">
@@ -286,17 +380,12 @@
     </div>
     <datalist id="placeList"></datalist>
     <button class="find-btn" id="findBtn">경로 찾기</button>
+    <div class="route-error" id="routeError"></div>
   </div>
 
-  <div class="route-error" id="routeError"></div>
-
-  <div class="stats" id="statsRow" style="display:none;">
-    <div><div class="stat-label">총 거리</div><div class="stat-value" id="statDist">-<span class="unit">m</span></div></div>
-    <div><div class="stat-label">총 소요시간</div><div class="stat-value" id="statTime">-<span class="unit">분</span></div></div>
-  </div>
   <div class="legend">
-    <div class="legend-item"><span class="sw-line traffic"></span> <span id="trafficCount">교통 경로망 (차도)</span></div>
-    <div class="legend-item"><span class="sw-line walk"></span> <span id="walkCount">도보 경로망 (인도)</span></div>
+    <div class="legend-item"><span class="sw-line traffic"></span> 교통 경로망 (차도, 44개)</div>
+    <div class="legend-item"><span class="sw-line walk"></span> 도보 경로망 (인도, 9개)</div>
     <div class="legend-item"><span class="sw-line mixed"></span> 교통+도보 경로망 (혼합)</div>
     <div class="legend-item"><span class="sw-line accent"></span> 최단경로</div>
     <div class="legend-item"><span class="sw-dot"></span> 장소 (nav.places)</div>
@@ -304,26 +393,46 @@
     <div class="legend-item"><span class="sw-dot start"></span> 출발지</div>
     <div class="legend-item"><span class="sw-dot end"></span> 목적지</div>
   </div>
-  <label class="curve-toggle-row">
-    <input type="checkbox" id="curveToggle">
-    곡선 편집 손잡이 표시 (교통/도보 경로망)
-  </label>
-  <label class="curve-toggle-row">
-    <input type="checkbox" id="focusToggle">
-    경로에 포함된 노드/경로망만 표시
-  </label>
-  <label class="curve-toggle-row">
-    <input type="checkbox" id="dirArrowToggle" checked>
-    일방통행 화살표 표시
-  </label>
-  <label class="curve-toggle-row">
-    <input type="checkbox" id="dirEditToggle">
-    경로망 클릭으로 일방통행 편집 허용
-  </label>
+
+  <div class="settings-row" id="settingsRow">
+    <label class="curve-toggle-row">
+      <input type="checkbox" id="curveToggle">
+      곡선 편집 손잡이 표시 (교통/도보 경로망)
+    </label>
+    <label class="curve-toggle-row">
+      <input type="checkbox" id="focusToggle">
+      경로에 포함된 노드/경로망만 표시
+    </label>
+    <label class="curve-toggle-row">
+      <input type="checkbox" id="dirArrowToggle">
+      일방통행 화살표 표시
+    </label>
+    <label class="curve-toggle-row">
+      <input type="checkbox" id="dirEditToggle">
+      경로망 클릭으로 일방통행 편집 허용
+    </label>
+    <label class="curve-toggle-row">
+      <input type="checkbox" id="coordClickToggle">
+      지도 클릭 시 좌표 표시
+    </label>
+    <label class="curve-toggle-row">
+      <input type="checkbox" id="stepsDetailToggle">
+      경로 상세 표시
+    </label>
+    <label class="curve-toggle-row">
+      <input type="checkbox" id="zoomControlToggle">
+      지도 크기 조절 버튼 표시
+    </label>
+  </div>
+
+  <div class="stats" id="statsRow" style="display:none;">
+    <div><div class="stat-label">총 거리</div><div class="stat-value" id="statDist">-<span class="unit">m</span></div></div>
+    <div><div class="stat-label">총 소요시간</div><div class="stat-value" id="statTime">-<span class="unit">분</span></div></div>
+  </div>
 
 </div>
 
-<button class="panel-toggle panel-toggle-right" id="toolPanelToggle" aria-label="편집 도구 접기/펴기" title="편집 도구 접기/펴기">☰</button>
+<button class="panel-toggle panel-toggle-right" id="toolPanelToggle" aria-label="편집 도구 접기/펼치기" title="편집 도구 접기/펼치기">✏️</button>
 <div class="panel panel-right" id="toolPanel">
   <h1>지도 편집 도구</h1>
 
@@ -338,7 +447,7 @@
         <div class="tool-form-row">
           <label>경도</label><input type="text" id="nodeLon" placeholder="128.967...">
         </div>
-        <button class="tool-pick-btn" id="pickForCreateBtn" type="button">📍 지도에서 좌표 찍기</button>
+        <button class="tool-pick-btn" id="pickForCreateBtn" type="button">🔍 지도에서 좌표 찍기</button>
         <div class="tool-form-row">
           <label>이름</label><input type="text" id="nodeName" placeholder="tmp 또는 실제 이름">
         </div>
@@ -381,7 +490,7 @@
         <div class="tool-form-row">
           <label>경도</label><input type="text" id="moveNodeLon" placeholder="128.967...">
         </div>
-        <button class="tool-pick-btn" id="pickForMoveBtn" type="button">📍 지도에서 좌표 찍기</button>
+        <button class="tool-pick-btn" id="pickForMoveBtn" type="button">🔍 지도에서 좌표 찍기</button>
         <label class="curve-toggle-row">
           <input type="checkbox" id="moveNodeAutoDelete" checked>
           위치 수정 시 연결된 경로망 자동 삭제
@@ -461,13 +570,6 @@
 <div class="attribution">© Kakao Corp.</div>
 <div class="tooltip" id="tooltip"></div>
 
-<div class="edge-context-menu" id="edgeContextMenu">
-  <div class="edge-context-menu-label">경로망 종류 변경</div>
-  <button data-cat="교통경로망"><span class="sw traffic"></span>교통경로망 (차도)</button>
-  <button data-cat="도보경로망"><span class="sw walk"></span>도보경로망 (인도)</button>
-  <button data-cat="혼합경로망"><span class="sw mixed"></span>교통+도보 경로망 (혼합)</button>
-</div>
-
 <script src="https://dapi.kakao.com/v2/maps/sdk.js?appkey=555053101d1712e21f2bc07dfa63bf69&autoload=false" onerror="document.getElementById('sdkError').style.display='block'"></script>
 <div id="sdkError" style="display:none; position:absolute; top:14px; left:50%; transform:translateX(-50%); z-index:9; background:#fdecea; color:#611a15; border:1px solid #f5c6cb; border-radius:8px; padding:10px 16px; font-family:system-ui; font-size:13px;">
   카카오맵 SDK 스크립트 로드에 실패했습니다 (네트워크 차단 또는 잘못된 키).
@@ -484,18 +586,32 @@ kakao.maps.load(async function () {
   const byId = {};
   places.forEach(p => { if (!byId[p.id]) byId[p.id] = p; });
 
-  const trafficCount = data.edges.filter(e => e.category === '교통경로망').length;
-  const walkCount = data.edges.filter(e => e.category === '도보경로망').length;
-  document.getElementById('trafficCount').textContent = `교통 경로망 (차도, ${trafficCount}개)`;
-  document.getElementById('walkCount').textContent = `도보 경로망 (인도, ${walkCount}개)`;
-
   const center = new kakao.maps.LatLng(35.1155, 128.9670);
   const map = new kakao.maps.Map(document.getElementById('map'), {
     center: center,
     level: 4
   });
-  map.addControl(new kakao.maps.ZoomControl(), kakao.maps.ControlPosition.RIGHT);
-  map.addControl(new kakao.maps.MapTypeControl(), kakao.maps.ControlPosition.RIGHT);
+  // starts unchecked (off) like every other setting here, so the control is
+  // only added once the checkbox is actually turned on — not added up front.
+  const zoomControl = new kakao.maps.ZoomControl();
+  // toggling this only shows/hides the +/- button widget — map.setZoomable()
+  // is never touched, so scroll-wheel zoom keeps working either way.
+  document.getElementById('zoomControlToggle').addEventListener('change', (ev) => {
+    if (ev.target.checked) map.addControl(zoomControl, kakao.maps.ControlPosition.RIGHT);
+    else map.removeControl(zoomControl);
+  });
+
+  // custom 지도/스카이뷰 toggle instead of Kakao's built-in MapTypeControl —
+  // built-in control positions (TOPRIGHT/RIGHT/etc.) can't be anchored next
+  // to the title text, so this reimplements it as plain buttons placed right
+  // next to the h1 in the top bar.
+  document.querySelectorAll('.maptype-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const typeId = btn.dataset.type === 'skyview' ? kakao.maps.MapTypeId.SKYVIEW : kakao.maps.MapTypeId.ROADMAP;
+      map.setMapTypeId(typeId);
+      document.querySelectorAll('.maptype-btn').forEach(b => b.classList.toggle('active', b === btn));
+    });
+  });
 
   // temporary helper: click the map to read off exact coordinates
   const coordBox = document.createElement('div');
@@ -515,6 +631,10 @@ kakao.maps.load(async function () {
     const latlng = mouseEvent.latLng;
     coordBox.textContent = `lat: ${latlng.getLat().toFixed(7)}, lng: ${latlng.getLng().toFixed(7)}`;
   });
+  const coordClickToggle = document.getElementById('coordClickToggle');
+  function updateCoordBoxVisibility() { coordBox.style.display = coordClickToggle.checked ? 'block' : 'none'; }
+  coordClickToggle.addEventListener('change', updateCoordBoxVisibility);
+  updateCoordBoxVisibility();
 
   const fullBounds = new kakao.maps.LatLngBounds();
   places.forEach(p => fullBounds.extend(new kakao.maps.LatLng(p.lat, p.lon)));
@@ -536,7 +656,12 @@ kakao.maps.load(async function () {
   const graph = {};
   const edgeInfo = {};
   function addEdge(a, b, dist, time, direction) {
+    // some legacy roads rows reference place_ids with no real coordinates
+    // (original source-data typos/omissions) — skip them so the router can
+    // never hand back a path containing a node we have nothing to draw.
     if (!byId[a] || !byId[b]) return;
+    // direction is relative to this a->b order: 'forward' allows only a->b,
+    // 'backward' only b->a, anything else (undefined/none) allows both.
     if (direction !== 'backward') (graph[a] = graph[a] || []).push({ to: b, dist, time });
     if (direction !== 'forward') (graph[b] = graph[b] || []).push({ to: a, dist, time });
     edgeInfo[a + '|' + b] = { dist, time };
@@ -588,6 +713,10 @@ kakao.maps.load(async function () {
   const WALK_COLOR = '#1a56db';
   const DEFAULT_ROAD_COLOR = '#9b9a94';
 
+  // build a gently curved line between two points by bowing a quadratic
+  // bezier out from the midpoint; curveOffsetM is the sideways bow in meters
+  // (sign picks which side), works fine over short campus-scale distances
+  // where lat/lon can be treated as locally flat.
   function curvedLatLngs(aLat, aLon, bLat, bLon, curveOffsetM, steps = 20) {
     const midLat = (aLat + bLat) / 2, midLon = (aLon + bLon) / 2;
     const dLat = bLat - aLat, dLon = bLon - aLon;
@@ -607,12 +736,18 @@ kakao.maps.load(async function () {
     return pts;
   }
 
+  // perpendicular unit vector (in raw degree space, matching curvedLatLngs) and
+  // its midpoint, used both to draw the curve and to invert a drag point back
+  // into a signed offset in meters.
   function edgeGeometry(aLat, aLon, bLat, bLon) {
     const midLat = (aLat + bLat) / 2, midLon = (aLon + bLon) / 2;
     const dLat = bLat - aLat, dLon = bLon - aLon;
     const len = Math.sqrt(dLat * dLat + dLon * dLon) || 1e-9;
     return { midLat, midLon, perpLat: -dLon / len, perpLon: dLat / len };
   }
+  // bearing in degrees, 0 = north, clockwise — same flat-earth approximation
+  // (lat/lon treated as Cartesian) already used by edgeGeometry/curvedLatLngs,
+  // fine at campus scale. Used to point the one-way arrow the right way.
   function bearingDeg(aLat, aLon, bLat, bLon) {
     return Math.atan2(bLon - aLon, bLat - aLat) * 180 / Math.PI;
   }
@@ -621,6 +756,7 @@ kakao.maps.load(async function () {
   const curveHandleOverlays = [];
   const edgeOverlays = {};
 
+  // ---- 돋보기(loupe): 커서 아래를 크게 확대해 보여줘서 좌표를 정밀하게 찍을 수 있게 함 ----
   const magnifierEl = document.getElementById('magnifier');
   const loupeMap = new kakao.maps.Map(document.getElementById('magnifierMap'), {
     center: map.getCenter(), level: 1
@@ -628,6 +764,8 @@ kakao.maps.load(async function () {
   loupeMap.setDraggable(false);
   loupeMap.setZoomable(false);
 
+  // small blue dots for already-placed nodes, so lining up a new/moved
+  // coordinate against existing ones is possible while zoomed in.
   const loupeNodeOverlays = {};
   function addLoupeNodeDot(p) {
     const dot = document.createElement('div');
@@ -648,22 +786,10 @@ kakao.maps.load(async function () {
     return map.getProjection().coordsFromContainerPoint(point);
   }
 
-  function pointXY(pt) {
-    return {
-      x: typeof pt.getX === 'function' ? pt.getX() : pt.x,
-      y: typeof pt.getY === 'function' ? pt.getY() : pt.y,
-    };
-  }
-
-  function clientPointFromLatLng(latlng) {
-    const rect = mapDiv.getBoundingClientRect();
-    const point = pointXY(map.getProjection().containerPointFromCoords(latlng));
-    return { x: rect.left + point.x, y: rect.top + point.y };
-  }
-
-  mapDiv.addEventListener('contextmenu', (domEvent) => domEvent.preventDefault());
-
   function onPickMove(domEvent) {
+    // the loupe map is built inside a display:none container, so Kakao
+    // measures it as 0×0 at creation time — relayout() once right as it
+    // first becomes visible so it actually has tiles to show.
     const wasHidden = magnifierEl.style.display !== 'block';
     const latlng = latLngFromClientPoint(domEvent.clientX, domEvent.clientY);
     magnifierEl.style.left = (domEvent.clientX + 24) + 'px';
@@ -728,6 +854,10 @@ kakao.maps.load(async function () {
         : [new kakao.maps.LatLng(a.lat, a.lon), new kakao.maps.LatLng(b.lat, b.lon)];
     }
 
+    // 교통+도보 겸용 경로망은 한 선을 반반 색칠할 수 없으니, 진행 방향 기준
+    // 좌/우로 살짝 띄운 두 개의 얇은 선(교통색 + 도보색)으로 나란히 표현한다.
+    // 오프셋은 각 점 주변의 국소 접선 방향(이웃 점 차이) 기준이라 곡선을 따라도
+    // 계속 나란히 붙어 있다.
     function offsetPath(sideSign) {
       const base = computePath();
       const offsetDeg = (1.3 * sideSign) / 111320;
@@ -762,6 +892,8 @@ kakao.maps.load(async function () {
     }
     const rec = edgeOverlays[edgeKey(e.from, e.to)] = {
       polyline, mixedWalkLine, handleOverlay: null,
+      // called after a's/b's lat/lon are mutated in place (node move) so the
+      // line/handle follow without a full remove+recreate.
       refresh: () => {
         if (isMixed) {
           polyline.setPath(offsetPath(1));
@@ -772,6 +904,9 @@ kakao.maps.load(async function () {
       }
     };
 
+    // drag handle: sits at the current control point, grabbing it and moving
+    // the mouse bows the whole line live; release saves it to the DB.
+    // offered on both 교통/도보 경로망 edges — other layers stay plain lines.
     if (!isTraffic && !isWalk) return;
 
     const handle = document.createElement('div');
@@ -787,6 +922,8 @@ kakao.maps.load(async function () {
     const handleOverlay = new kakao.maps.CustomOverlay({
       position: handlePosition(), content: handle, yAnchor: 0.5, xAnchor: 0.5, zIndex: 3
     });
+    // respect the checkbox's current on/off state instead of always showing —
+    // matters both for edges present at load and ones added later via 잇기
     const curveHandlesVisible = document.getElementById('curveToggle').checked;
     handleOverlay.setMap(curveHandlesVisible ? map : null);
     curveHandleOverlays.push(handleOverlay);
@@ -811,7 +948,7 @@ kakao.maps.load(async function () {
         curve = Math.round(offsetDeg * 111320);
         polyline.setPath(computePath());
         handleOverlay.setPosition(handlePosition());
-        buildDirectionArrows();
+        buildDirectionArrows(); // keeps the embedded one-way arrows glued to the line while it bows
       }
       function onUp() {
         document.removeEventListener('mousemove', onMove);
@@ -823,7 +960,7 @@ kakao.maps.load(async function () {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ from: e.from, to: e.to, curve })
         }).then(r => r.json()).then(() => {
-          showTip(`<b>곡률 저장됨</b><br><span class="t-id">${e.from} → ${e.to} · ${curve}m</span>`, startEv);
+          showTip(`<b>곡률 저장됨</b><br><span class="t-id">${e.from} ↔ ${e.to} · ${curve}m</span>`, startEv);
           setTimeout(hideTip, 1400);
         }).catch(() => {});
       }
@@ -831,11 +968,19 @@ kakao.maps.load(async function () {
       document.addEventListener('mouseup', onUp);
     });
 
+    // ---- 일방통행 표시 (교통경로망 전용): 경로선 자체를 클릭할 때마다 자유 →
+    // 정방향 → 역방향 → 자유 순으로 순환. 자유 상태면 화살표를 아예 그리지
+    // 않고(=양방향 이동 가능), 방향이 정해지면 그 경로선을 따라 거리에 비례한
+    // 개수의 화살표를 박아 넣어 눈에 잘 띄게 표시한다. 도보경로망에는 곡선
+    // 손잡이만 제공하고 이 기능은 적용하지 않는다.
     function buildDirectionArrows() {
       (rec.dirArrowOverlays || []).forEach(o => o.setMap(null));
       rec.dirArrowOverlays = [];
       if (!isTraffic || !e.direction) return;
 
+      // respect both the visibility checkbox and focus mode, same rule the
+      // curve handles follow — computed fresh here since this rebuilds the
+      // overlays from scratch (drag/refresh don't go through applyFocusMode).
       const arrowVisible = document.getElementById('dirArrowToggle').checked;
       const focusOn = document.getElementById('focusToggle').checked && currentRouteNodeIds.size > 0;
       const edgeShown = !focusOn || currentRouteEdgeKeys.has(edgeKey(e.from, e.to));
@@ -854,6 +999,8 @@ kakao.maps.load(async function () {
         const lon = p0.getLng() + (p1.getLng() - p0.getLng()) * frac;
         let angle = bearingDeg(p0.getLat(), p0.getLng(), p1.getLat(), p1.getLng());
         if (e.direction === 'backward') angle += 180;
+        // '➤' points east (bearing 90) at rotate(0), so shift by -90 to align
+        // the CSS rotation with our north-is-0 bearing convention.
         angle -= 90;
 
         const arrowEl = document.createElement('div');
@@ -873,6 +1020,9 @@ kakao.maps.load(async function () {
       rec.refresh = () => { refreshBeforeDir(); buildDirectionArrows(); };
 
       kakao.maps.event.addListener(polyline, 'click', () => {
+        // locked by default so an ordinary click while browsing the map (route
+        // search, panning near a line) can't silently flip a road's direction —
+        // must be explicitly enabled via the "경로망 클릭으로 일방통행 편집 허용" checkbox.
         if (!document.getElementById('dirEditToggle').checked) return;
         e.direction = !e.direction ? 'forward' : (e.direction === 'forward' ? 'backward' : null);
         buildDirectionArrows();
@@ -892,99 +1042,6 @@ kakao.maps.load(async function () {
       });
     }
   }
-  const edgeContextMenu = document.getElementById('edgeContextMenu');
-  let contextMenuEdge = null;
-  const CATEGORY_ROAD_TYPE = { '교통경로망': '차도', '도보경로망': '인도', '혼합경로망': '혼합' };
-
-  function showEdgeContextMenu(edge, x, y) {
-    contextMenuEdge = edge;
-    edgeContextMenu.style.display = 'flex';
-    const menuRect = edgeContextMenu.getBoundingClientRect();
-    edgeContextMenu.style.left = Math.min(x, window.innerWidth - menuRect.width - 8) + 'px';
-    edgeContextMenu.style.top = Math.min(y, window.innerHeight - menuRect.height - 8) + 'px';
-    edgeContextMenu.querySelectorAll('button').forEach(btn => {
-      btn.classList.toggle('current', btn.dataset.cat === edge.category);
-    });
-  }
-  function hideEdgeContextMenu() {
-    edgeContextMenu.style.display = 'none';
-    contextMenuEdge = null;
-  }
-  function changeEdgeCategory(edge, newCategory) {
-    const from = edge.from, to = edge.to, dist = edge.dist, time = edge.time;
-    fetch('/api/edge', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ from, to, category: newCategory, road_type: CATEGORY_ROAD_TYPE[newCategory], dist, time })
-    }).then(r => r.json().then(body => ({ status: r.status, body }))).then(({ status, body }) => {
-      if (status !== 200) {
-        showTip(`<b>변경 실패</b><br><span class="t-id">${body.error}</span>`);
-        setTimeout(hideTip, 1800);
-        return;
-      }
-      removeEdgeFromMap(from, to);
-      const newEdge = { from, to, dist, time, category: newCategory };
-      if (body.curve) newEdge.curve = body.curve;
-      data.edges.push(newEdge);
-      addEdge(from, to, dist, time);
-      addEdgeToMap(newEdge);
-      applyFocusMode();
-      showTip(`<b>변경됨</b><br><span class="t-id">${from} → ${to} · ${newCategory}</span>`);
-      setTimeout(hideTip, 1400);
-    }).catch(err => {
-      showTip(`<b>변경 실패</b><br><span class="t-id">${err.message}</span>`);
-      setTimeout(hideTip, 1800);
-    });
-  }
-  edgeContextMenu.querySelectorAll('button').forEach(btn => {
-    btn.addEventListener('click', () => {
-      if (!contextMenuEdge) return;
-      const newCat = btn.dataset.cat;
-      if (newCat !== contextMenuEdge.category) changeEdgeCategory(contextMenuEdge, newCat);
-      hideEdgeContextMenu();
-    });
-  });
-  document.addEventListener('click', (domEvent) => {
-    if (!edgeContextMenu.contains(domEvent.target)) hideEdgeContextMenu();
-  });
-  document.addEventListener('keydown', (domEvent) => { if (domEvent.key === 'Escape') hideEdgeContextMenu(); });
-
-  // ---- right-click hit-testing: Kakao Polyline overlays don't reliably fire their own
-  // 'rightclick' event, so listen on the map instead and find the nearest edge in screen pixels ----
-  function pointToSegmentDistPx(p, a, b) {
-    const dx = b.x - a.x, dy = b.y - a.y;
-    const len2 = dx * dx + dy * dy;
-    let t = len2 === 0 ? 0 : ((p.x - a.x) * dx + (p.y - a.y) * dy) / len2;
-    t = Math.max(0, Math.min(1, t));
-    const cx = a.x + t * dx, cy = a.y + t * dy;
-    return Math.hypot(p.x - cx, p.y - cy);
-  }
-  function findNearestEdge(latlng) {
-    const proj = map.getProjection();
-    const clickPt = pointXY(proj.containerPointFromCoords(latlng));
-    let best = null, bestDist = Infinity;
-    data.edges.forEach(edge => {
-      const a = byId[edge.from], b = byId[edge.to];
-      if (!a || !b) return;
-      const curve = edge.curve || 0;
-      const pathLatLngs = curve
-        ? curvedLatLngs(a.lat, a.lon, b.lat, b.lon, curve)
-        : [new kakao.maps.LatLng(a.lat, a.lon), new kakao.maps.LatLng(b.lat, b.lon)];
-      const pathPts = pathLatLngs.map(ll => pointXY(proj.containerPointFromCoords(ll)));
-      for (let i = 0; i < pathPts.length - 1; i++) {
-        const d = pointToSegmentDistPx(clickPt, pathPts[i], pathPts[i + 1]);
-        if (d < bestDist) { bestDist = d; best = edge; }
-      }
-    });
-    return bestDist <= 10 ? best : null;
-  }
-  kakao.maps.event.addListener(map, 'rightclick', (mouseEvent) => {
-    const edge = findNearestEdge(mouseEvent.latLng);
-    if (!edge) return;
-    const pt = clientPointFromLatLng(mouseEvent.latLng);
-    showEdgeContextMenu(edge, pt.x, pt.y);
-  });
-
   data.edges.forEach(addEdgeToMap);
 
   const placeDotOverlays = {};
@@ -1011,16 +1068,26 @@ kakao.maps.load(async function () {
   places.forEach(addPlaceDot);
 
   // ---- datalist for place search ----
+  // nodes with "tmp" in their id are working/test nodes and must not be selectable as origin/destination
   const isTempNode = (pid) => /tmp/i.test(pid);
   const placeList = document.getElementById('placeList');
   const allPlaceList = document.getElementById('allPlaceList');
+  const tmpPlaceList = document.getElementById('tmpPlaceList');
 
+  // exact display-label -> id lookup, rebuilt alongside the datalists. Used
+  // instead of regex-parsing the "(id)" suffix back out of the label text —
+  // that parsing breaks whenever a place's own id or name contains
+  // parentheses (e.g. a user-typed node named "버스정류장(위쪽)", where id===name),
+  // since the label then ends in nested "))" and no longer matches a single
+  // non-nested "(...)" at the end of the string. A direct map has no such
+  // assumption about what characters the id/name can contain.
   const placeLabelToId = {};
   function placeLabel(p) { return `${p.name} (${p.id})`; }
 
   function rebuildPlaceLists() {
     placeList.innerHTML = '';
     allPlaceList.innerHTML = '';
+    tmpPlaceList.innerHTML = '';
     for (const k in placeLabelToId) delete placeLabelToId[k];
     places.slice()
       .sort((a, b) => a.name.localeCompare(b.name, 'ko'))
@@ -1030,6 +1097,11 @@ kakao.maps.load(async function () {
         const opt2 = document.createElement('option');
         opt2.value = label;
         allPlaceList.appendChild(opt2);
+        if (isTempNode(p.id)) {
+          const optTmp = document.createElement('option');
+          optTmp.value = label;
+          tmpPlaceList.appendChild(optTmp);
+        }
       });
     places.slice()
       .filter(p => !isTempNode(p.id))
@@ -1053,6 +1125,7 @@ kakao.maps.load(async function () {
     return null;
   }
 
+  // same as resolveInput but also accepts tmp nodes — used by the map-editing tools
   function resolveAnyInput(val) {
     const trimmed = val.trim();
     if (placeLabelToId[trimmed]) return placeLabelToId[trimmed];
@@ -1061,9 +1134,13 @@ kakao.maps.load(async function () {
     return null;
   }
 
-  const EDGE_INPUT_NEXT = { edgeFrom: 'edgeTo', walkEdgeFrom: 'walkEdgeTo', mixedEdgeFrom: 'mixedEdgeTo', delEdgeFrom: 'delEdgeTo' };
+  // ---- 노드/경로망 폼: 지도의 노드를 클릭하면 포커스된 입력창에 바로 채워짐 ----
+  // 경로 폼은 출발 필드를 채우고 나면 자동으로 도착 필드로 넘어가서, "출발 클릭
+  // → 도착 클릭" 두 번만 누르면 경로 하나가 완성됨. 노드 삭제/위치수정은 입력창이
+  // 하나뿐이라 다음 필드로 넘어가지 않고 그 자리에서 끝남.
+  const EDGE_INPUT_NEXT = { edgeFrom: 'edgeTo', walkEdgeFrom: 'walkEdgeTo', mixedEdgeFrom: 'mixedEdgeTo', delEdgeFrom: 'delEdgeTo', tmpFromInput: 'tmpToInput' };
   let activeCoordInput = null;
-  ['edgeFrom', 'edgeTo', 'walkEdgeFrom', 'walkEdgeTo', 'mixedEdgeFrom', 'mixedEdgeTo', 'delEdgeFrom', 'delEdgeTo', 'deleteNodeInput', 'moveNodeInput'].forEach(id => {
+  ['edgeFrom', 'edgeTo', 'walkEdgeFrom', 'walkEdgeTo', 'mixedEdgeFrom', 'mixedEdgeTo', 'delEdgeFrom', 'delEdgeTo', 'deleteNodeInput', 'moveNodeInput', 'tmpFromInput', 'tmpToInput'].forEach(id => {
     const el = document.getElementById(id);
     el.addEventListener('focus', () => { activeCoordInput = el; });
   });
@@ -1079,6 +1156,8 @@ kakao.maps.load(async function () {
     currentRouteEdgeKeys = new Set();
   }
 
+  // ---- 포커스 모드: 켜져 있고 표시 중인 경로가 있으면 그 경로에 포함된
+  // 노드/경로망만 남기고 나머지는 숨김. 곡선 손잡이도 같은 규칙을 따름. ----
   function applyFocusMode() {
     const focusOn = document.getElementById('focusToggle').checked && currentRouteNodeIds.size > 0;
     Object.entries(placeDotOverlays).forEach(([id, overlay]) => {
@@ -1102,11 +1181,11 @@ kakao.maps.load(async function () {
     const errEl = document.getElementById('routeError');
 
     if (!result) {
-      errEl.textContent = '두 지점 사이에 연결된 경로가 없습니다 (도로 데이터가 부족해 그래프가 끊겨 있을 수 있습니다).';
+      errEl.textContent = '연결된 경로가 없습니다.';
       errEl.style.display = 'block';
       document.getElementById('statsRow').style.display = 'none';
       applyFocusMode();
-      layoutTopBar();
+      fitTopBarWidth();
       return;
     }
     errEl.style.display = 'none';
@@ -1122,6 +1201,10 @@ kakao.maps.load(async function () {
       currentRouteEdgeKeys.add(edgeKey(path[i], path[i + 1]));
     }
 
+    // trace the same geometry the traffic/도보 network layer actually draws
+    // (including any hand-dragged curve) rather than a fresh straight line
+    // between node centers — otherwise the highlight visibly diverges from
+    // the road it's supposed to be following.
     function edgeCurveForDirection(a, b) {
       const found = data.edges.find(e => (e.from === a && e.to === b) || (e.from === b && e.to === a));
       if (!found || !found.curve) return 0;
@@ -1134,7 +1217,7 @@ kakao.maps.load(async function () {
       const segment = curve
         ? curvedLatLngs(a.lat, a.lon, b.lat, b.lon, curve)
         : [new kakao.maps.LatLng(a.lat, a.lon), new kakao.maps.LatLng(b.lat, b.lon)];
-      if (pathLatLngs.length) segment.shift();
+      if (pathLatLngs.length) segment.shift(); // drop the point shared with the previous segment
       pathLatLngs.push(...segment);
     }
     const polyline = new kakao.maps.Polyline({
@@ -1153,8 +1236,13 @@ kakao.maps.load(async function () {
       const isEndpoint = isStart || isEnd;
       const isTmp = isTempNode(pid);
       if (!isTmp) stepNum++;
+      // freeze this node's own number — stepNum keeps changing as the loop
+      // continues, and the mouseenter handler below fires long after the
+      // loop has finished, so it must close over a per-iteration copy.
       const thisStepNum = stepNum;
 
+      // tmp 노드는 실제 장소가 아닌 임시 경유점이라 지도 위 동그라미 표시는 생략
+      // (경로 상세 목록에는 계속 표시됨)
       if (!isTmp) {
         const size = isEndpoint ? 22 : 16;
         const endpointColor = isStart ? '#2a78d6' : (isEnd ? '#e34948' : null);
@@ -1164,6 +1252,8 @@ kakao.maps.load(async function () {
         wrap.style.flexDirection = 'column';
         wrap.style.alignItems = 'center';
 
+        // 출발지/목적지는 원 안의 번호 + 범례 색으로 이미 구분되므로, 이름을
+        // 담은 말풍선 라벨은 중간 경유지에서만 보여준다.
         if (!isEndpoint) {
           const label = document.createElement('div');
           label.className = 'path-label';
@@ -1209,7 +1299,7 @@ kakao.maps.load(async function () {
 
     map.setBounds(routeBounds, 60);
     applyFocusMode();
-    layoutTopBar();
+    fitTopBarWidth();
   }
 
   function findRoute() {
@@ -1222,9 +1312,9 @@ kakao.maps.load(async function () {
       clearPathLayer();
       document.getElementById('steps').innerHTML = '';
       document.getElementById('statsRow').style.display = 'none';
-      errEl.textContent = '목록에서 정확한 장소를 선택해주세요 (입력창을 클릭하면 검색 목록이 뜹니다).';
+      errEl.textContent = '목록에서 정확한 장소를 선택해주세요 (입력창을 클릭하면 검색 목록이 나옵니다).';
       errEl.style.display = 'block';
-      layoutTopBar();
+      fitTopBarWidth();
       return;
     }
     renderRoute(dijkstra(fromId, toId), fromId, toId);
@@ -1233,6 +1323,9 @@ kakao.maps.load(async function () {
   document.getElementById('findBtn').addEventListener('click', findRoute);
   document.getElementById('fromInput').addEventListener('keydown', (e) => { if (e.key === 'Enter') findRoute(); });
   document.getElementById('toInput').addEventListener('keydown', (e) => { if (e.key === 'Enter') findRoute(); });
+  // browsers filter the datalist by the input's current text (not just selection state),
+  // so a pre-filled value only ever matches itself. Clear on focus to show the full list,
+  // and if the user leaves without picking anything, restore what was there before.
   function wireFullListOnFocus(input) {
     let prev = input.value;
     input.addEventListener('focus', () => { prev = input.value; input.value = ''; });
@@ -1254,26 +1347,72 @@ kakao.maps.load(async function () {
     toggle.textContent = open ? '경로 상세 보기 ▾' : '경로 상세 닫기 ▴';
   });
 
+  // "경로 상세 표시" 체크박스는 패널을 열고 닫는 게 아니라, 경로 상세 기능
+  // 자체(플로팅 버튼 + 패널)를 화면에서 통째로 보이거나 안 보이게 한다.
+  const stepsDetailToggle = document.getElementById('stepsDetailToggle');
+  function updateStepsFeatureVisibility() {
+    const visible = stepsDetailToggle.checked;
+    toggle.style.display = visible ? '' : 'none';
+    if (!visible) panel.style.display = 'none'; // 숨길 땐 열려 있던 패널도 같이 닫기
+  }
+  stepsDetailToggle.addEventListener('change', updateStepsFeatureVisibility);
+  updateStepsFeatureVisibility();
+
   const infoPanel = document.getElementById('panel');
   const panelToggle = document.getElementById('panelToggle');
   const toolPanel = document.getElementById('toolPanel');
 
-  function layoutTopBar() {
-    if (infoPanel.classList.contains('collapsed')) {
-      toolPanel.style.top = '14px';
-      return;
-    }
-    const barBottom = infoPanel.offsetHeight + 14;
-    toolPanel.style.top = barBottom + 'px';
-    panelToggle.style.top = (infoPanel.offsetHeight + 10) + 'px';
-  }
-  window.addEventListener('resize', layoutTopBar);
-
+  // both toggle buttons are fixed at their own screen corner via CSS now
+  // (top-left / top-right), independent of the top bar's variable height,
+  // so no JS repositioning is needed here anymore.
   panelToggle.addEventListener('click', () => {
     infoPanel.classList.toggle('collapsed');
     panelToggle.classList.toggle('collapsed');
-    layoutTopBar();
+    fitTopBarWidth();
   });
+
+  // CSS width:auto/fit-content on a wrapping flex container computes its
+  // "shrink-to-fit" size from the *unwrapped* sum of every child (that's how
+  // the spec's intrinsic sizing works for flex containers), not from the
+  // actual wrapped rows — so it kept landing on the max-width:60% cap no
+  // matter what, leaving blank space after a row that wraps narrower than
+  // that. Measuring the real rendered content and setting an explicit pixel
+  // width sidesteps that entirely: let the CSS cap decide the wrap, then
+  // shrink the box down to whatever the wrapped content actually needs.
+  function fitTopBarWidth() {
+    if (infoPanel.classList.contains('collapsed')) return;
+    infoPanel.style.width = '';
+    const rect = infoPanel.getBoundingClientRect();
+    const style = getComputedStyle(infoPanel);
+    const paddingRight = parseFloat(style.paddingRight) || 0;
+    const borderRight = parseFloat(style.borderRightWidth) || 0;
+    let maxRight = rect.left;
+    // .title-row itself is deliberately excluded — it's forced to width:100%
+    // so it always occupies a full line by itself, which would make IT (not
+    // the real content) the thing that determines the box's width every
+    // time. Its actual content (h1, plus the maptype buttons when they're
+    // still in normal flow rather than the full-screen absolute position)
+    // is measured directly instead.
+    const candidates = [
+      infoPanel.querySelector('.title-row h1'),
+      infoPanel.querySelector('.picker'),
+      infoPanel.querySelector('.legend'),
+      infoPanel.querySelector('.settings-row'),
+      infoPanel.querySelector('.stats'),
+    ];
+    const maptypeToggle = infoPanel.querySelector('.maptype-toggle');
+    if (maptypeToggle && getComputedStyle(maptypeToggle).position !== 'absolute') {
+      candidates.push(maptypeToggle);
+    }
+    candidates.forEach(el => {
+      if (!el || getComputedStyle(el).display === 'none') return;
+      const r = el.getBoundingClientRect();
+      if (r.right > maxRight) maxRight = r.right;
+    });
+    infoPanel.style.width = Math.ceil(maxRight - rect.left + paddingRight + borderRight) + 'px';
+    infoPanel.style.visibility = 'visible'; // reveal only now that the correct width is already applied
+  }
+  window.addEventListener('resize', fitTopBarWidth);
 
   const toolPanelToggle = document.getElementById('toolPanelToggle');
   toolPanelToggle.addEventListener('click', () => {
@@ -1293,6 +1432,8 @@ kakao.maps.load(async function () {
   wireGroupHeader('nodeGroupHeader', 'nodeGroupBody', '노드 기능');
   wireGroupHeader('edgeGroupHeader', 'edgeGroupBody', '경로망 기능');
 
+  // both listeners funnel through applyFocusMode so curve-handle visibility
+  // and focus-mode hiding never fight over the same overlay's setMap state.
   document.getElementById('curveToggle').addEventListener('change', applyFocusMode);
   document.getElementById('focusToggle').addEventListener('change', applyFocusMode);
   document.getElementById('dirArrowToggle').addEventListener('change', applyFocusMode);
@@ -1306,12 +1447,18 @@ kakao.maps.load(async function () {
     return 2 * R * Math.asin(Math.sqrt(s));
   }
 
+  // campus bounding box (existing place coords ± padding) — a coordinate typo
+  // like a missing leading "1" on the longitude lands far outside this and
+  // used to blow up map.setBounds() into a near-global view (blank white map).
   const CAMPUS_BOUNDS = { latMin: 35.105, latMax: 35.125, lonMin: 128.958, lonMax: 128.978 };
   function inCampusBounds(lat, lon) {
     return lat >= CAMPUS_BOUNDS.latMin && lat <= CAMPUS_BOUNDS.latMax &&
            lon >= CAMPUS_BOUNDS.lonMin && lon <= CAMPUS_BOUNDS.lonMax;
   }
 
+  // safety net shared by every edit tool below: disables the submit button
+  // for the duration of its network call so a slow response or a double
+  // click can't fire the same create/delete/move twice.
   function setBusy(btn, busy) {
     btn.disabled = busy;
     btn.style.opacity = busy ? 0.6 : '';
@@ -1389,7 +1536,7 @@ kakao.maps.load(async function () {
     }).finally(() => setBusy(btn, false));
   });
 
-  // ---- 교통/도보 경로망 잇기 (도구별 폼만 다르고 로직은 동일해서 공유) ----
+  // ---- 교통/도보 경로망 잇기 (두 도구가 폼 필드만 다르고 로직은 동일해서 공유) ----
   const edgeToolBtn = document.getElementById('edgeToolBtn');
   const edgeToolForm = document.getElementById('edgeToolForm');
   edgeToolBtn.addEventListener('click', () => edgeToolForm.classList.toggle('open'));
@@ -1423,7 +1570,7 @@ kakao.maps.load(async function () {
       }
       const a = byId[fromId], b = byId[toId];
       const dist = Math.round(haversineM(a.lat, a.lon, b.lat, b.lon));
-      const time = Math.max(Math.round(dist / 1.18), 1);
+      const time = Math.max(Math.round(dist / 1.2), 5);
 
       setBusy(btn, true);
       fetch('/api/edge', {
@@ -1436,19 +1583,20 @@ kakao.maps.load(async function () {
           msgEl.textContent = '오류: ' + body.error;
           return;
         }
+        // 반대 카테고리의 기존 경로가 있었다면 서버가 지우고 교체했으므로 지도에서도 제거
         (body.replaced || []).forEach(r => removeEdgeFromMap(r.from, r.to));
         const e = { from: fromId, to: toId, dist, time, category };
-        if (body.curve) e.curve = body.curve;
+        if (body.curve) e.curve = body.curve; // 교체된 경로의 곡선을 서버가 이어받았다면 반영
         data.edges.push(e);
         addEdge(fromId, toId, dist, time);
         addEdgeToMap(e);
-        applyFocusMode();
+        applyFocusMode(); // keeps the new edge hidden too if focus mode is currently on
         document.getElementById(fromInputId).value = '';
         document.getElementById(toInputId).value = '';
         msgEl.className = 'tool-form-msg ok';
         msgEl.textContent = (body.replaced && body.replaced.length)
-          ? `${fromId} → ${toId} 연결 완료 (${dist}m) — 기존 ${body.replaced[0].category} 교체됨`
-          : `${fromId} → ${toId} 연결 완료 (${dist}m)`;
+          ? `${fromId} ↔ ${toId} 연결 완료 (${dist}m) — 기존 ${body.replaced[0].category} 교체됨`
+          : `${fromId} ↔ ${toId} 연결 완료 (${dist}m)`;
       }).catch(err => {
         msgEl.className = 'tool-form-msg err';
         msgEl.textContent = '오류: ' + err.message;
@@ -1478,6 +1626,9 @@ kakao.maps.load(async function () {
     if (i !== -1) data.edges.splice(i, 1);
   }
 
+  // node move with "자동 삭제" off keeps edges in the DB, so their on-map
+  // geometry has to be re-derived from the node's new lat/lon instead of
+  // being torn down and recreated.
   function refreshNodeGeometry(id) {
     data.edges.forEach(e => {
       if (e.from !== id && e.to !== id) return;
@@ -1556,7 +1707,7 @@ kakao.maps.load(async function () {
       if (status !== 200) {
         msgEl.className = 'tool-form-msg err';
         msgEl.textContent = body.error === 'edge not found'
-          ? `삭제 실패: ${fromId} → ${toId} 사이에 연결된 경로가 없습니다.`
+          ? `삭제 실패: ${fromId} ↔ ${toId} 사이에 연결된 경로가 없습니다.`
           : ('삭제 실패: ' + body.error);
         return;
       }
@@ -1564,7 +1715,7 @@ kakao.maps.load(async function () {
       document.getElementById('delEdgeFrom').value = '';
       document.getElementById('delEdgeTo').value = '';
       msgEl.className = 'tool-form-msg ok';
-      msgEl.textContent = `${fromId} → ${toId} 경로를 삭제했습니다.`;
+      msgEl.textContent = `${fromId} ↔ ${toId} 경로를 삭제했습니다.`;
     }).catch(err => {
       msgEl.className = 'tool-form-msg err';
       msgEl.textContent = '삭제 실패: ' + err.message;
@@ -1601,7 +1752,48 @@ kakao.maps.load(async function () {
     msgEl.textContent = `'${p.name}' (${id}) 위치로 이동했습니다.`;
   });
 
+  // ---- tmp 경로 찾기 (좌측 하단 별도 박스) ----
+  // 메인 "경로 찾기"의 출발/도착 입력은 tmp 노드를 아예 걸러내므로(resolveInput),
+  // tmp끼리 경로를 잡아보려면 이 박스가 필요함 — 같은 dijkstra/renderRoute를 그대로
+  // 재사용해서 결과는 위쪽 통계/경로 상세와 동일하게 표시된다.
+  function findTmpRoute() {
+    const msgEl = document.getElementById('tmpFindMsg');
+    msgEl.className = 'tmp-finder-msg'; msgEl.textContent = '';
+    const fromId = resolveAnyInput(document.getElementById('tmpFromInput').value);
+    const toId = resolveAnyInput(document.getElementById('tmpToInput').value);
+    if (!fromId || !isTempNode(fromId) || !toId || !isTempNode(toId)) {
+      msgEl.className = 'tmp-finder-msg err';
+      msgEl.textContent = '출발/도착 모두 tmp 노드를 목록에서 선택해주세요.';
+      return;
+    }
+    if (fromId === toId) {
+      msgEl.className = 'tmp-finder-msg err';
+      msgEl.textContent = '출발지와 도착지가 같습니다.';
+      return;
+    }
+    renderRoute(dijkstra(fromId, toId), fromId, toId);
+  }
+  document.getElementById('tmpFindBtn').addEventListener('click', findTmpRoute);
+  document.getElementById('tmpFromInput').addEventListener('keydown', (e) => { if (e.key === 'Enter') findTmpRoute(); });
+  document.getElementById('tmpToInput').addEventListener('keydown', (e) => { if (e.key === 'Enter') findTmpRoute(); });
+  document.getElementById('tmpSwapBtn').addEventListener('click', () => {
+    const f = document.getElementById('tmpFromInput'), t = document.getElementById('tmpToInput');
+    const tmp = f.value; f.value = t.value; t.value = tmp;
+  });
+
+  const tmpFinder = document.getElementById('tmpFinder');
+  const tmpFinderToggle = document.getElementById('tmpFinderToggle');
+  tmpFinderToggle.addEventListener('click', () => {
+    tmpFinder.classList.toggle('collapsed');
+    tmpFinderToggle.classList.toggle('collapsed');
+  });
+
   // ---- 노드 위치 수정하기 ----
+  // moving a node invalidates the distance/time on any edge touching it. By
+  // default the server drops those edges as part of the move — same "no
+  // half-valid data" rule the other tools follow. The "자동 삭제" checkbox
+  // lets the user opt out and keep the edges (geometry only, stale dist/time)
+  // when they intend to re-measure them manually afterward.
   document.getElementById('moveNodeToolBtn').addEventListener('click', () =>
     document.getElementById('moveNodeToolForm').classList.toggle('open'));
 
@@ -1651,6 +1843,7 @@ kakao.maps.load(async function () {
       body.updatedEdges.forEach(u => {
         const edge = data.edges.find(e2 => edgeKey(e2.from, e2.to) === edgeKey(u.from, u.to));
         if (edge) { edge.dist = u.dist; edge.time = u.time; }
+        // refreshes the routing graph's weights too, not just the display data
         removeEdge(u.from, u.to);
         addEdge(u.from, u.to, u.dist, u.time, u.direction);
       });
@@ -1660,7 +1853,7 @@ kakao.maps.load(async function () {
       if (overlay) overlay.setPosition(new kakao.maps.LatLng(lat, lon));
       const loupeOverlay = loupeNodeOverlays[id];
       if (loupeOverlay) loupeOverlay.setPosition(new kakao.maps.LatLng(lat, lon));
-      refreshNodeGeometry(id);
+      refreshNodeGeometry(id); // repositions any edges that were kept (자동 삭제 off)
 
       msgEl.className = 'tool-form-msg ok';
       msgEl.textContent = body.removedEdges.length
@@ -1674,11 +1867,9 @@ kakao.maps.load(async function () {
     }).finally(() => setBusy(btn, false));
   });
 
-  // default: GATE -> PL17 (기존 사이트와 동일한 기본 경로)
-  const defaultFrom = byId['GATE'] ? 'GATE' : places[0].id;
-  const defaultTo = byId['PL17'] ? 'PL17' : (places[1] ? places[1].id : places[0].id);
-  document.getElementById('fromInput').value = `${byId[defaultFrom].name} (${defaultFrom})`;
-  document.getElementById('toInput').value = `${byId[defaultTo].name} (${defaultTo})`;
+  // default: same as before, but now user-editable
+  document.getElementById('fromInput').value = `${byId['GATE'].name} (GATE)`;
+  document.getElementById('toInput').value = `${byId['S12-04F01E'].name} (S12-04F01E)`;
   findRoute();
 });
 }
